@@ -112,3 +112,46 @@ export interface AudioPlayerContextType extends AudioPlayerState {
   clearError: () => void
   setLibraryTracks: (tracks: Track[]) => void
 }
+
+// Last.fm Integration Types
+export interface LastfmAuthResponse {
+  auth_url: string
+  token: string
+}
+
+export interface LastfmSessionRequest {
+  token: string
+}
+
+export interface LastfmSessionResponse {
+  session_key: string
+  username: string
+  message: string
+}
+
+export interface ScrobbleRequest {
+  session_key: string
+  timestamp: number
+  album_artist?: string
+}
+
+export interface NowPlayingRequest {
+  session_key: string
+}
+
+export interface ScrobbleResponse {
+  success: boolean
+  message: string
+  scrobble_id?: string
+}
+
+export interface NowPlayingResponse {
+  success: boolean
+  message: string
+}
+
+export interface LastfmSettings {
+  sessionKey: string | null
+  username: string | null
+  scrobblingEnabled: boolean
+}

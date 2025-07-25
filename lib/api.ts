@@ -6,7 +6,14 @@ import {
   RescanResponse,
   TrackFilters,
   SearchParams,
-  PaginationParams
+  PaginationParams,
+  LastfmAuthResponse,
+  LastfmSessionRequest,
+  LastfmSessionResponse,
+  ScrobbleRequest,
+  NowPlayingRequest,
+  ScrobbleResponse,
+  NowPlayingResponse
 } from './types'
 import { trackCache } from './cache'
 
@@ -302,6 +309,37 @@ class ApiService {
   // Get album art URL for a track
   getAlbumArtUrl(trackId: number): string {
     return `${this.baseUrl}/tracks/${trackId}/albumart`
+  }
+
+  // Last.fm Integration
+
+  // Get Last.fm authentication URL
+  async getLastfmAuthUrl(): Promise<LastfmAuthResponse> {
+    return this.fetchApi<LastfmAuthResponse>('/lastfm/auth')
+  }
+
+  // Create Last.fm session with token
+  async createLastfmSession(request: LastfmSessionRequest): Promise<LastfmSessionResponse> {
+    return this.fetchApi<LastfmSessionResponse>('/lastfm/session', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    })
+  }
+
+  // Scrobble a track to Last.fm
+  async scrobbleTrack(trackId: number, request: ScrobbleRequest): Promise<ScrobbleResponse> {
+    return this.fetchApi<ScrobbleResponse>(`/tracks/${trackId}/scrobble`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    })
+  }
+
+  // Update "now playing" status on Last.fm
+  async updateNowPlaying(trackId: number, request: NowPlayingRequest): Promise<NowPlayingResponse> {
+    return this.fetchApi<NowPlayingResponse>(`/tracks/${trackId}/now-playing`, {
+      method: 'POST',
+      body: JSON.stringify(request),
+    })
   }
 }
 

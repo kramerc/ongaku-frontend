@@ -39,6 +39,14 @@ This frontend is fully integrated with the Ongaku Music Server API v1.0.0:
 - **Active Filters Display**: Visual indicators for applied filters with easy removal
 - **Loading States**: Smooth loading indicators throughout the interface
 
+### Last.fm Integration
+- **Account Connection**: Secure OAuth authentication with Last.fm
+- **Automatic Scrobbling**: Tracks are automatically scrobbled when played for sufficient time
+- **Now Playing Updates**: Real-time status updates to Last.fm
+- **Privacy Controls**: Enable/disable scrobbling, disconnect account anytime
+- **Smart Scrobbling**: Follows Last.fm guidelines (50% played or 4 minutes minimum)
+- **Status Indicators**: Visual feedback when scrobbling is active
+
 ## Getting Started
 
 ### Prerequisites

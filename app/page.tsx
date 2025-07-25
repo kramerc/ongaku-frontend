@@ -5,12 +5,15 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Loader2, Search, Music, RefreshCw, X } from "lucide-react"
+import { Loader2, Search, Music, RefreshCw, X, Settings } from "lucide-react"
 import { VirtualMusicTable } from "./components/virtual-music-table"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LibraryBrowser } from "@/components/library-browser"
 import { AudioPlayer } from "@/components/audio-player"
-import { AudioPlayerProvider, useAudioPlayer } from "@/contexts/audio-player-context"
+import { AudioPlayerProvider } from "@/contexts/audio-player-context"
+import { LastfmStatusIndicator } from "@/components/lastfm-status-indicator"
+import { LastfmSettings } from "@/components/lastfm-settings"
+import { Modal } from "@/components/ui/modal"
 import { Badge } from "@/components/ui/badge"
 import { Track, TrackListResponse, LibraryStats } from "@/lib/types"
 import { apiService } from "@/lib/api"
@@ -41,6 +44,7 @@ function MusicLibraryContent() {
   const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0, operation: "" })
   const [isSyncing, setIsSyncing] = useState(false)
   const [scrollResetTrigger, setScrollResetTrigger] = useState(false)
+  const [showSettings, setShowSettings] = useState(false)
 
   const perPage = 50
 
@@ -348,6 +352,7 @@ function MusicLibraryContent() {
                 </Badge>
               )}
               <ThemeToggle />
+              <LastfmStatusIndicator />
             </div>
 
           <form onSubmit={handleSearch} className="flex gap-2 flex-1 max-w-md ml-auto">
@@ -418,6 +423,16 @@ function MusicLibraryContent() {
                 )}
               </Button>
             )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setShowSettings(true)}
+              title="Settings"
+            >
+              <Settings className="w-3 h-3" />
+            </Button>
           </div>
         </div>
 
@@ -504,6 +519,15 @@ function MusicLibraryContent() {
 
       {/* Audio Player */}
       <AudioPlayer formatDuration={formatDuration} />
+
+      {/* Settings Modal */}
+      <Modal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        title="Settings"
+      >
+        <LastfmSettings />
+      </Modal>
     </div>
   )
 }

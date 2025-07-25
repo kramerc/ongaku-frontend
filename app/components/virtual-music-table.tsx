@@ -56,17 +56,15 @@ const COLUMN_WIDTHS = {
 const TrackRow = memo(({
   track,
   index,
-  tracks,
   formatDuration,
   formatAudioQuality
 }: {
   track: Track
   index: number
-  tracks: Track[]
   formatDuration: (seconds: number) => string
   formatAudioQuality: (sampleRate: number, bitDepth: number, channels: number) => string
 }) => {
-  const { currentTrack, isPlaying, play, pause, addToQueue, addAllToQueue } = useAudioPlayer()
+  const { currentTrack, isPlaying, play, pause, addToQueue } = useAudioPlayer()
 
   const isCurrentTrack = currentTrack?.id === track.id
   const isTrackPlaying = isCurrentTrack && isPlaying
@@ -591,7 +589,6 @@ export function VirtualMusicTable({
                       key={`${track.id}-${visibleStartIndex + index}`}
                       track={track}
                       index={visibleStartIndex + index}
-                      tracks={sortedTracks}
                       formatDuration={formatDuration}
                       formatAudioQuality={formatAudioQuality}
                     />

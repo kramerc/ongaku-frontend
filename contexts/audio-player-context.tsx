@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useReducer, useRef, useEffect, useCallback } from 'react'
 import { Track, AudioPlayerState, AudioPlayerContextType } from '@/lib/types'
 import { API_BASE_URL } from '@/lib/types'
+import { useScrobbling } from '@/hooks/use-scrobbling'
 
 // Action types for the reducer
 type AudioPlayerAction =
@@ -106,6 +107,9 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const playingIntentRef = useRef(false)
   const retryCountRef = useRef(0)
   const maxRetries = 3
+
+  // Last.fm scrobbling integration
+  const { onTrackStart, onTimeUpdate, isScrobblingEnabled, username } = useScrobbling()
 
   // Helper function to retry loading audio after abort
   const retryAudioLoad = useCallback(() => {
@@ -584,6 +588,11 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         if (isMountedRef.current) {
           audio.load()
         }
+
+        // Notify Last.fm about the new track
+        if (isScrobblingEnabled) {
+          onTrackStart(state.currentTrack)
+        }
       }
     } else if (audioRef.current && !state.currentTrack) {
       // Clear source when no track is selected
@@ -594,7 +603,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       dispatch({ type: 'SET_CURRENT_TIME', payload: 0 })
       dispatch({ type: 'SET_DURATION', payload: 0 })
     }
-  }, [state.currentTrack])
+  }, [state.currentTrack, isScrobblingEnabled, onTrackStart])
 
   // Update audio volume when volume state changes
   useEffect(() => {
@@ -640,7 +649,15 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     if (state.isPlaying && audioRef.current) {
       timeUpdateIntervalRef.current = setInterval(() => {
         if (audioRef.current) {
-          dispatch({ type: 'SET_CURRENT_TIME', payload: audioRef.current.currentTime })
+          const currentTime = audioRef.current.currentTime
+          const duration = audioRef.current.duration
+
+          dispatch({ type: 'SET_CURRENT_TIME', payload: currentTime })
+
+          // Update Last.fm scrobbling status
+          if (isScrobblingEnabled && duration > 0) {
+            onTimeUpdate(currentTime, duration)
+          }
         }
       }, 100)
     } else {
@@ -655,7 +672,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         clearInterval(timeUpdateIntervalRef.current)
       }
     }
-  }, [state.isPlaying])
+  }, [state.isPlaying, isScrobblingEnabled, onTimeUpdate])
 
   const play = useCallback(async (track?: Track) => {
     console.log('play() called with:', { track: track?.title, currentTrack: state.currentTrack?.title })

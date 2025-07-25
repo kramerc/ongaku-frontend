@@ -1,8 +1,8 @@
 "use client"
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { LastfmSettings, LastfmAuthResponse, LastfmSessionResponse } from '@/lib/types'
-import { apiService } from '@/lib/api'
+import { LastfmSettings } from '@/lib/types'
+import { lastFmService } from '@/lib/lastfm-service'
 
 interface LastfmContextType extends LastfmSettings {
   isAuthenticated: boolean
@@ -29,18 +29,58 @@ export function LastfmProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Load settings from localStorage on mount
+  // Load saved settings and initialize service on mount
   useEffect(() => {
-    try {
-      const savedSettings = localStorage.getItem(LASTFM_STORAGE_KEY)
-      if (savedSettings) {
-        const parsed = JSON.parse(savedSettings) as LastfmSettings
-        setSettings(parsed)
-      }
-    } catch (error) {
-      console.warn('Failed to load Last.fm settings from localStorage:', error)
+    // Initialize the Last.fm service
+    const apiKey = process.env.NEXT_PUBLIC_LASTFM_API_KEY
+    const secret = process.env.NEXT_PUBLIC_LASTFM_SECRET
+
+    if (apiKey && secret) {
+      lastFmService.init({
+        apiKey,
+        secret,
+        callbackUrl: `${window.location.origin}/lastfm/callback`
+      })
+      console.log('🚀 LastfmContext: Service initialized with API credentials')
+    } else {
+      console.error('❌ LastfmContext: Missing API credentials in environment variables')
     }
-  }, [])
+
+    // Load saved settings
+    const savedSettings = localStorage.getItem('lastfm-settings')
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings)
+        setSettings(parsed)
+        console.log('📁 LastfmContext: Loaded settings from localStorage:', parsed)
+      } catch (error) {
+        console.error('❌ LastfmContext: Failed to parse saved settings:', error)
+      }
+    }
+  }, [])  // Initialize Last.fm service on mount
+  useEffect(() => {
+    console.log('🔧 LastfmContext: Initializing Last.fm service...')
+    const apiKey = process.env.NEXT_PUBLIC_LASTFM_API_KEY
+    const secret = process.env.NEXT_PUBLIC_LASTFM_SECRET
+
+    if (apiKey && secret) {
+      lastFmService.init({
+        apiKey,
+        secret,
+        callbackUrl: typeof window !== 'undefined' ? `${window.location.origin}/lastfm/callback` : undefined,
+      })
+
+      // If we have a session key, set it in the service
+      if (settings.sessionKey) {
+        console.log('🔑 LastfmContext: Setting existing session key in service')
+        lastFmService.setSessionKey(settings.sessionKey)
+      }
+
+      console.log('✅ LastfmContext: Service initialized successfully')
+    } else {
+      console.warn('⚠️ LastfmContext: API credentials not found in environment variables')
+    }
+  }, [settings.sessionKey])
 
   // Save settings to localStorage whenever they change
   useEffect(() => {
@@ -52,14 +92,18 @@ export function LastfmProvider({ children }: { children: React.ReactNode }) {
   }, [settings])
 
   const getAuthUrl = useCallback(async (): Promise<string> => {
+    console.log('🔗 LastfmContext: Getting auth URL...')
     setIsLoading(true)
     setError(null)
 
     try {
-      const response: LastfmAuthResponse = await apiService.getLastfmAuthUrl()
-      return response.auth_url
+      const callbackUrl = typeof window !== 'undefined' ? `${window.location.origin}/lastfm/callback` : undefined
+      const authUrl = lastFmService.getAuthUrl(callbackUrl)
+      console.log('✅ LastfmContext: Auth URL generated:', authUrl)
+      return authUrl
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to get Last.fm auth URL'
+      console.error('❌ LastfmContext: Failed to get auth URL:', error)
       setError(errorMessage)
       throw new Error(errorMessage)
     } finally {
@@ -68,19 +112,24 @@ export function LastfmProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const authenticateWithToken = useCallback(async (token: string): Promise<void> => {
+    console.log('🔐 LastfmContext: Authenticating with token:', token)
+    console.log('🔍 LastfmContext: Service initialized?', lastFmService.isAuthenticated !== undefined)
     setIsLoading(true)
     setError(null)
 
     try {
-      const response: LastfmSessionResponse = await apiService.createLastfmSession({ token })
+      const result = await lastFmService.authenticate(token)
+      console.log('✅ LastfmContext: Authentication successful:', result)
 
       setSettings(prev => ({
         ...prev,
-        sessionKey: response.session_key,
-        username: response.username,
+        sessionKey: result.sessionKey,
+        username: result.username,
       }))
+      console.log('💾 LastfmContext: Settings updated with new session')
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to authenticate with Last.fm'
+      console.error('❌ LastfmContext: Authentication failed:', error)
       setError(errorMessage)
       throw new Error(errorMessage)
     } finally {

@@ -46,62 +46,81 @@ export function LastfmSettings() {
   useEffect(() => {
     if (!authPopup) return
 
-    const checkPopup = async () => {
-      try {
-        if (authPopup.closed) {
-          setIsAuthenticating(false)
-          setAuthPopup(null)
+    // Listen for messages from the popup
+    const handleMessage = (event: MessageEvent) => {
+      console.log('🔥 Received postMessage:', {
+        origin: event.origin,
+        source: event.source === authPopup ? 'our popup' : 'unknown source',
+        data: event.data
+      })
 
-          // Poll for authentication status - check if localStorage was updated
-          let attempts = 0
-          const maxAttempts = 10
-          const pollInterval = 1000 // 1 second
+      // Make sure the message is from our popup
+      if (event.source !== authPopup) {
+        console.warn('❌ Message not from our popup, ignoring')
+        return
+      }
 
-          const pollForAuth = async () => {
-            attempts++
-            try {
-              await checkAuthStatus()
+      if (event.data.type === 'lastfm-token') {
+        const token = event.data.token
+        console.log('✅ Token received from popup:', token)
 
-              // If we're now authenticated, stop polling
-              if (isAuthenticated) {
-                return
-              }
-            } catch (error) {
-              console.warn('Failed to check auth status:', error)
-            }
-
-            if (attempts < maxAttempts) {
-              setTimeout(pollForAuth, pollInterval)
-            }
-          }
-
-          // Start polling after a short delay
-          setTimeout(pollForAuth, 1000)
-          return
-        }
-
-        // Continue monitoring
-        setTimeout(checkPopup, 1000)
-      } catch (error) {
-        console.warn('Error monitoring popup:', error)
-        setIsAuthenticating(false)
+        // Close the popup and authenticate
+        console.log('🔒 Closing popup and starting authentication...')
+        authPopup.close()
         setAuthPopup(null)
+
+        if (token) {
+          authenticateWithToken(token)
+            .then(() => {
+              console.log('🎉 Authentication successful!')
+              setIsAuthenticating(false)
+            })
+            .catch((error) => {
+              console.error('❌ Failed to authenticate with token:', error)
+              setIsAuthenticating(false)
+            })
+        } else {
+          console.warn('⚠️ No token received in message')
+          setIsAuthenticating(false)
+        }
+      } else {
+        console.log('ℹ️ Unknown message type:', event.data.type)
       }
     }
 
-    checkPopup()
+    window.addEventListener('message', handleMessage)
+    console.log('👂 Started listening for postMessages from popup')
+
+    // Also monitor if popup is closed manually
+    const checkClosed = () => {
+      if (authPopup.closed) {
+        console.log('🚪 Popup was closed manually')
+        setIsAuthenticating(false)
+        setAuthPopup(null)
+        window.removeEventListener('message', handleMessage)
+        return
+      }
+      setTimeout(checkClosed, 1000)
+    }
+
+    checkClosed()
 
     return () => {
+      console.log('🧹 Cleaning up popup monitoring')
+      window.removeEventListener('message', handleMessage)
       if (authPopup && !authPopup.closed) {
+        console.log('🚪 Closing popup during cleanup')
         authPopup.close()
       }
     }
-  }, [authPopup, checkAuthStatus, isAuthenticated])
+  }, [authPopup, authenticateWithToken])
 
   const handleStartAuth = async () => {
     try {
+      console.log('🚀 Starting Last.fm authentication...')
       setIsAuthenticating(true)
       const authUrl = await getAuthUrl()
+      console.log('🔗 Generated auth URL:', authUrl)
 
       const popup = window.open(
         authUrl,
@@ -110,13 +129,16 @@ export function LastfmSettings() {
       )
 
       if (popup) {
+        console.log('✅ Popup opened successfully')
+        console.log('👂 Setting up message listener...')
         setAuthPopup(popup)
         popup.focus()
       } else {
+        console.error('❌ Failed to open popup')
         throw new Error('Failed to open popup - please allow popups for this site')
       }
     } catch (error) {
-      console.error('Failed to start Last.fm authentication:', error)
+      console.error('💥 Failed to start Last.fm authentication:', error)
       setIsAuthenticating(false)
     }
   }
@@ -246,7 +268,10 @@ export function LastfmSettings() {
           {isAuthenticating && (
             <div className="text-xs text-muted-foreground text-center space-y-1">
               <div>Complete the authorization in the popup window.</div>
-              <div>Close the popup when authorization is complete.</div>
+              <div>The popup will automatically send the token back.</div>
+              <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
+                <strong>🔍 Debug:</strong> Check your browser console (F12) for detailed postMessage logs!
+              </div>
             </div>
           )}
 

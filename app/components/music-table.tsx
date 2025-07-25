@@ -1,14 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -40,9 +35,9 @@ interface Track {
 interface MusicTableProps {
   tracks: Track[]
   loading: boolean
-  currentPage: number
-  totalPages: number
-  onPageChange: (page: number) => void
+  loadingMore: boolean
+  hasMorePages: boolean
+  onLoadMore: () => void
   formatDuration: (seconds: number) => string
 }
 
@@ -52,14 +47,31 @@ type SortDirection = "asc" | "desc"
 export function MusicTable({
   tracks,
   loading,
-  currentPage,
-  totalPages,
-  onPageChange,
+  loadingMore,
+  hasMorePages,
+  onLoadMore,
   formatDuration,
 }: MusicTableProps) {
   const [sortField, setSortField] = useState<SortField>("title")
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
-  const [columnWidths, setColumnWidths] = useState<Record<string, number>>({})
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Infinite scroll effect
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current
+    if (!scrollContainer) return
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scrollContainer
+      // Load more when user scrolls to within 200px of the bottom
+      if (scrollHeight - scrollTop <= clientHeight + 200 && hasMorePages && !loadingMore) {
+        onLoadMore()
+      }
+    }
+
+    scrollContainer.addEventListener('scroll', handleScroll)
+    return () => scrollContainer.removeEventListener('scroll', handleScroll)
+  }, [hasMorePages, loadingMore, onLoadMore])
 
   // Handle sorting
   const handleSort = (field: SortField) => {
@@ -87,12 +99,6 @@ export function MusicTable({
 
     return sortDirection === "asc" ? comparison : -comparison
   })
-
-  // Format file size
-  const formatFileSize = (bitrate: number, duration: number) => {
-    const sizeInMB = (bitrate * duration) / (8 * 1024)
-    return `${sizeInMB.toFixed(1)} MB`
-  }
 
   // Format audio quality
   const formatAudioQuality = (sampleRate: number, bitDepth: number, channels: number) => {
@@ -125,12 +131,12 @@ export function MusicTable({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="h-full flex flex-col">
       {/* Table */}
-      <div className="border rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="flex-1 border rounded-lg overflow-hidden">
+        <div className="h-full overflow-auto" ref={scrollContainerRef}>
           <Table>
-            <TableHeader>
+            <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
                 <TableHead
                   className="cursor-pointer hover:bg-muted/50 select-none min-w-[200px]"
@@ -199,8 +205,8 @@ export function MusicTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedTracks.map((track) => (
-                <TableRow key={track.id} className="hover:bg-muted/50">
+              {sortedTracks.map((track, index) => (
+                <TableRow key={`${track.id}-${index}`} className="hover:bg-muted/50">
                   <TableCell className="font-medium">
                     <div className="truncate" title={track.title}>
                       {track.title || "Unknown Title"}
@@ -235,48 +241,22 @@ export function MusicTable({
                   </TableCell>
                 </TableRow>
               ))}
+
+              {/* Loading more indicator */}
+              {loadingMore && (
+                <TableRow key="loading-more">
+                  <TableCell colSpan={8} className="text-center py-4">
+                    <div className="flex items-center justify-center">
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Loading more tracks...
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </div>
       </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <div className="text-sm text-muted-foreground">
-            Page {currentPage} of {totalPages}
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => onPageChange(1)} disabled={currentPage === 1}>
-              <ChevronsLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onPageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onPageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronRight className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onPageChange(totalPages)}
-              disabled={currentPage === totalPages}
-            >
-              <ChevronsRight className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -10,12 +10,20 @@ import { VirtualMusicTable } from "./components/virtual-music-table"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LibraryBrowser } from "@/components/library-browser"
 import { AudioPlayer } from "@/components/audio-player"
-import { AudioPlayerProvider } from "@/contexts/audio-player-context"
+import { AudioPlayerProvider, useAudioPlayer } from "@/contexts/audio-player-context"
 import { Badge } from "@/components/ui/badge"
 import { Track, TrackListResponse, LibraryStats } from "@/lib/types"
 import { apiService } from "@/lib/api"
 
 export default function MusicLibrary() {
+  return (
+    <AudioPlayerProvider>
+      <MusicLibraryContent />
+    </AudioPlayerProvider>
+  )
+}
+
+function MusicLibraryContent() {
   const [tracks, setTracks] = useState<Track[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -92,7 +100,8 @@ export default function MusicLibrary() {
           // Prevent duplicate tracks by filtering out any that already exist
           const existingIds = new Set(prev.map(track => track.id))
           const newTracks = data.tracks.filter(track => !existingIds.has(track.id))
-          return [...prev, ...newTracks]
+          const updatedTracks = [...prev, ...newTracks]
+          return updatedTracks
         })
       } else {
         setTracks(data.tracks)
@@ -307,8 +316,7 @@ export default function MusicLibrary() {
   }
 
   return (
-    <AudioPlayerProvider>
-      <div className="h-screen flex flex-col">
+    <div className="h-screen flex flex-col">
         {/* Header with Search Bar */}
         <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-3">
           <div className="flex items-center gap-3">
@@ -497,6 +505,5 @@ export default function MusicLibrary() {
       {/* Audio Player */}
       <AudioPlayer formatDuration={formatDuration} />
     </div>
-    </AudioPlayerProvider>
   )
 }

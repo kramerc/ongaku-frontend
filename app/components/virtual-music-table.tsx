@@ -219,7 +219,7 @@ export function VirtualMusicTable({
   const [scrollTop, setScrollTop] = useState(0)
   const [containerHeight, setContainerHeight] = useState(0)
 
-  const { addAllToQueue } = useAudioPlayer()
+  const { addAllToQueue, setLibraryTracks } = useAudioPlayer()
 
   // Handle sorting
   const handleSort = (field: SortField) => {
@@ -302,6 +302,11 @@ export function VirtualMusicTable({
       return sortDirection === "asc" ? comparison : -comparison
     })
   }, [tracks, sortField, sortDirection])
+
+  // Update library tracks in audio player context when sorted tracks change
+  useEffect(() => {
+    setLibraryTracks(sortedTracks)
+  }, [sortedTracks, setLibraryTracks])
 
   // Calculate virtual scrolling parameters
   const { visibleStartIndex, visibleEndIndex, totalHeight, offsetY } = useMemo(() => {

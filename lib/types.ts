@@ -87,6 +87,8 @@ export interface AudioPlayerState {
   repeat: 'none' | 'one' | 'all'
   shuffle: boolean
   error: string | null
+  libraryTracks: Track[]
+  libraryIndex: number
 }
 
 export interface AudioPlayerContextType extends AudioPlayerState {
@@ -105,4 +107,5 @@ export interface AudioPlayerContextType extends AudioPlayerState {
   toggleShuffle: () => void
   playFromQueue: (index: number) => void
   clearError: () => void
+  setLibraryTracks: (tracks: Track[]) => void
 }

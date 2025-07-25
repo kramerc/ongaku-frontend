@@ -36,6 +36,8 @@ export function AudioPlayer({ formatDuration }: AudioPlayerProps) {
     repeat,
     shuffle,
     error,
+    libraryTracks,
+    libraryIndex,
     play,
     pause,
     next,
@@ -267,7 +269,15 @@ export function AudioPlayer({ formatDuration }: AudioPlayerProps) {
                 size="sm"
                 className="w-8 h-8 p-0"
                 onClick={previous}
-                disabled={currentIndex <= 0 && repeat !== 'all'}
+                disabled={
+                  // Disable if no queue and no library tracks
+                  (queue.length === 0 && libraryTracks.length === 0) ||
+                  // Disable if in queue and at beginning with no repeat
+                  (queue.length > 0 && currentIndex <= 0 && repeat !== 'all') ||
+                  // Disable if no queue but at beginning of library
+                  (queue.length === 0 && libraryTracks.length > 0 &&
+                   currentTrack && libraryTracks.findIndex(t => t.id === currentTrack.id) <= 0)
+                }
               >
                 <SkipBack className="w-4 h-4" />
               </Button>
@@ -290,7 +300,15 @@ export function AudioPlayer({ formatDuration }: AudioPlayerProps) {
                 size="sm"
                 className="w-8 h-8 p-0"
                 onClick={next}
-                disabled={currentIndex >= queue.length - 1 && repeat !== 'all'}
+                disabled={
+                  // Disable if no queue and no library tracks
+                  (queue.length === 0 && libraryTracks.length === 0) ||
+                  // Disable if in queue and at end with no repeat
+                  (queue.length > 0 && currentIndex >= queue.length - 1 && repeat !== 'all') ||
+                  // Disable if no queue but at end of library
+                  (queue.length === 0 && libraryTracks.length > 0 &&
+                   currentTrack && libraryTracks.findIndex(t => t.id === currentTrack.id) >= libraryTracks.length - 1)
+                }
               >
                 <SkipForward className="w-4 h-4" />
               </Button>

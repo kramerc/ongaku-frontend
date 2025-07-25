@@ -19,6 +19,8 @@ type AudioPlayerAction =
   | { type: 'TOGGLE_REPEAT' }
   | { type: 'TOGGLE_SHUFFLE' }
   | { type: 'SET_ERROR'; payload: string | null }
+  | { type: 'SET_LIBRARY_TRACKS'; payload: Track[] }
+  | { type: 'SET_LIBRARY_INDEX'; payload: number }
 
 const initialState: AudioPlayerState = {
   currentTrack: null,
@@ -31,6 +33,8 @@ const initialState: AudioPlayerState = {
   repeat: 'none',
   shuffle: false,
   error: null,
+  libraryTracks: [],
+  libraryIndex: -1,
 }
 
 function audioPlayerReducer(state: AudioPlayerState, action: AudioPlayerAction): AudioPlayerState {
@@ -81,6 +85,10 @@ function audioPlayerReducer(state: AudioPlayerState, action: AudioPlayerAction):
       return { ...state, shuffle: !state.shuffle }
     case 'SET_ERROR':
       return { ...state, error: action.payload }
+    case 'SET_LIBRARY_TRACKS':
+      return { ...state, libraryTracks: action.payload }
+    case 'SET_LIBRARY_INDEX':
+      return { ...state, libraryIndex: action.payload }
     default:
       return state
   }
@@ -235,43 +243,75 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       // Don't call next() directly here to avoid dependency issues
       // Instead, handle next track logic inline
       setTimeout(() => {
-        if (state.queue.length === 0) return
+        if (state.queue.length > 0) {
+          // Handle queue tracks
+          let nextIndex = -1
+          if (state.repeat === 'one') {
+            nextIndex = state.currentIndex
+          } else if (state.shuffle) {
+            // Simple shuffle: pick a random track that's not the current one
+            const availableIndices = state.queue
+              .map((_, index) => index)
+              .filter(index => index !== state.currentIndex)
 
-        let nextIndex = -1
-        if (state.repeat === 'one') {
-          nextIndex = state.currentIndex
-        } else if (state.shuffle) {
-          // Simple shuffle: pick a random track that's not the current one
-          const availableIndices = state.queue
-            .map((_, index) => index)
-            .filter(index => index !== state.currentIndex)
-
-          if (availableIndices.length === 0) {
-            nextIndex = state.repeat === 'all' ? 0 : -1
+            if (availableIndices.length === 0) {
+              nextIndex = state.repeat === 'all' ? 0 : -1
+            } else {
+              nextIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)]
+            }
           } else {
-            nextIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)]
+            const nextIdx = state.currentIndex + 1
+            if (nextIdx >= state.queue.length) {
+              nextIndex = state.repeat === 'all' ? 0 : -1
+            } else {
+              nextIndex = nextIdx
+            }
           }
-        } else {
-          const nextIdx = state.currentIndex + 1
-          if (nextIdx >= state.queue.length) {
-            nextIndex = state.repeat === 'all' ? 0 : -1
-          } else {
-            nextIndex = nextIdx
-          }
-        }
 
-        if (nextIndex >= 0 && state.queue[nextIndex]) {
-          const nextTrack = state.queue[nextIndex]
-          dispatch({ type: 'SET_CURRENT_INDEX', payload: nextIndex })
-          dispatch({ type: 'SET_CURRENT_TRACK', payload: nextTrack })
-          if (hasUserInteractedRef.current) {
-            dispatch({ type: 'SET_PLAYING', payload: true })
+          if (nextIndex >= 0 && state.queue[nextIndex]) {
+            const nextTrack = state.queue[nextIndex]
+            dispatch({ type: 'SET_CURRENT_INDEX', payload: nextIndex })
+            dispatch({ type: 'SET_CURRENT_TRACK', payload: nextTrack })
+            if (hasUserInteractedRef.current) {
+              dispatch({ type: 'SET_PLAYING', payload: true })
+            }
           }
+        } else if (state.libraryTracks.length > 0) {
+          // No queue, use library tracks as fallback
+          let nextLibraryIndex = -1
+
+          if (state.currentTrack) {
+            // Find current track in library
+            const currentLibraryIndex = state.libraryTracks.findIndex(t => t.id === state.currentTrack!.id)
+            if (currentLibraryIndex >= 0) {
+              nextLibraryIndex = currentLibraryIndex + 1
+            } else {
+              // Current track not in library, start from library index
+              nextLibraryIndex = state.libraryIndex + 1
+            }
+          } else {
+            // No current track, start from beginning or current library index
+            nextLibraryIndex = state.libraryIndex >= 0 ? state.libraryIndex + 1 : 0
+          }
+
+          // Check if we have a valid next track in library
+          if (nextLibraryIndex < state.libraryTracks.length) {
+            const nextTrack = state.libraryTracks[nextLibraryIndex]
+            dispatch({ type: 'SET_LIBRARY_INDEX', payload: nextLibraryIndex })
+            dispatch({ type: 'SET_CURRENT_TRACK', payload: nextTrack })
+            if (hasUserInteractedRef.current) {
+              dispatch({ type: 'SET_PLAYING', payload: true })
+            }
+          }
+          // If nextLibraryIndex >= libraryTracks.length, we've reached the end
         }
+        // If no queue and no library tracks, playback stops naturally
       }, 100)
     }
 
     const handleError = (e: Event) => {
+      if (!state.currentTrack) return;
+
       const audio = e.target as HTMLAudioElement
       const error = audio.error
 
@@ -351,37 +391,65 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
             e.preventDefault()
             // Trigger next track without calling the function directly
             setTimeout(() => {
-              // Use the same logic as handleEnded but for next
-              if (state.queue.length === 0) return
+              // Use the same logic as next() but inline
+              if (state.queue.length > 0) {
+                let nextIndex = -1
+                if (state.repeat === 'one') {
+                  nextIndex = state.currentIndex
+                } else if (state.shuffle) {
+                  const availableIndices = state.queue
+                    .map((_, index) => index)
+                    .filter(index => index !== state.currentIndex)
 
-              let nextIndex = -1
-              if (state.repeat === 'one') {
-                nextIndex = state.currentIndex
-              } else if (state.shuffle) {
-                const availableIndices = state.queue
-                  .map((_, index) => index)
-                  .filter(index => index !== state.currentIndex)
-
-                if (availableIndices.length === 0) {
-                  nextIndex = state.repeat === 'all' ? 0 : -1
+                  if (availableIndices.length === 0) {
+                    nextIndex = state.repeat === 'all' ? 0 : -1
+                  } else {
+                    nextIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)]
+                  }
                 } else {
-                  nextIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)]
+                  const nextIdx = state.currentIndex + 1
+                  if (nextIdx >= state.queue.length) {
+                    nextIndex = state.repeat === 'all' ? 0 : -1
+                  } else {
+                    nextIndex = nextIdx
+                  }
                 }
-              } else {
-                const nextIdx = state.currentIndex + 1
-                if (nextIdx >= state.queue.length) {
-                  nextIndex = state.repeat === 'all' ? 0 : -1
-                } else {
-                  nextIndex = nextIdx
-                }
-              }
 
-              if (nextIndex >= 0 && state.queue[nextIndex]) {
-                const nextTrack = state.queue[nextIndex]
-                dispatch({ type: 'SET_CURRENT_INDEX', payload: nextIndex })
-                dispatch({ type: 'SET_CURRENT_TRACK', payload: nextTrack })
-                if (state.isPlaying) {
-                  dispatch({ type: 'SET_PLAYING', payload: true })
+                if (nextIndex >= 0 && state.queue[nextIndex]) {
+                  const nextTrack = state.queue[nextIndex]
+                  dispatch({ type: 'SET_CURRENT_INDEX', payload: nextIndex })
+                  dispatch({ type: 'SET_CURRENT_TRACK', payload: nextTrack })
+                  if (state.isPlaying) {
+                    dispatch({ type: 'SET_PLAYING', payload: true })
+                  }
+                }
+              } else if (state.libraryTracks.length > 0) {
+                // No queue, use library tracks as fallback
+                let nextLibraryIndex = -1
+
+                if (state.currentTrack) {
+                  // Find current track in library
+                  const currentLibraryIndex = state.libraryTracks.findIndex(t => t.id === state.currentTrack!.id)
+                  if (currentLibraryIndex >= 0) {
+                    nextLibraryIndex = currentLibraryIndex + 1
+                  } else {
+                    // Current track not in library, start from library index
+                    nextLibraryIndex = state.libraryIndex + 1
+                  }
+                } else {
+                  // No current track, start from beginning or current library index
+                  nextLibraryIndex = state.libraryIndex >= 0 ? state.libraryIndex + 1 : 0
+                }
+
+                // Check if we have a valid next track in library
+                if (nextLibraryIndex < state.libraryTracks.length) {
+                  const nextTrack = state.libraryTracks[nextLibraryIndex]
+                  dispatch({ type: 'SET_LIBRARY_INDEX', payload: nextLibraryIndex })
+                  dispatch({ type: 'SET_CURRENT_TRACK', payload: nextTrack })
+                  if (state.isPlaying) {
+                    playingIntentRef.current = true
+                    dispatch({ type: 'SET_PLAYING', payload: true })
+                  }
                 }
               }
             }, 0)
@@ -398,26 +466,54 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
                 return
               }
 
-              if (state.queue.length === 0) return
-
-              let prevIndex = -1
-              if (state.repeat === 'one') {
-                prevIndex = state.currentIndex
-              } else {
-                const prevIdx = state.currentIndex - 1
-                if (prevIdx < 0) {
-                  prevIndex = state.repeat === 'all' ? state.queue.length - 1 : -1
+              if (state.queue.length > 0) {
+                let prevIndex = -1
+                if (state.repeat === 'one') {
+                  prevIndex = state.currentIndex
                 } else {
-                  prevIndex = prevIdx
+                  const prevIdx = state.currentIndex - 1
+                  if (prevIdx < 0) {
+                    prevIndex = state.repeat === 'all' ? state.queue.length - 1 : -1
+                  } else {
+                    prevIndex = prevIdx
+                  }
                 }
-              }
 
-              if (prevIndex >= 0 && state.queue[prevIndex]) {
-                const prevTrack = state.queue[prevIndex]
-                dispatch({ type: 'SET_CURRENT_INDEX', payload: prevIndex })
-                dispatch({ type: 'SET_CURRENT_TRACK', payload: prevTrack })
-                if (state.isPlaying) {
-                  dispatch({ type: 'SET_PLAYING', payload: true })
+                if (prevIndex >= 0 && state.queue[prevIndex]) {
+                  const prevTrack = state.queue[prevIndex]
+                  dispatch({ type: 'SET_CURRENT_INDEX', payload: prevIndex })
+                  dispatch({ type: 'SET_CURRENT_TRACK', payload: prevTrack })
+                  if (state.isPlaying) {
+                    dispatch({ type: 'SET_PLAYING', payload: true })
+                  }
+                }
+              } else if (state.libraryTracks.length > 0) {
+                // No queue, use library tracks as fallback
+                let prevLibraryIndex = -1
+
+                if (state.currentTrack) {
+                  // Find current track in library
+                  const currentLibraryIndex = state.libraryTracks.findIndex(t => t.id === state.currentTrack!.id)
+                  if (currentLibraryIndex >= 0) {
+                    prevLibraryIndex = currentLibraryIndex - 1
+                  } else {
+                    // Current track not in library, go to previous from library index
+                    prevLibraryIndex = state.libraryIndex - 1
+                  }
+                } else {
+                  // No current track, go to previous from current library index
+                  prevLibraryIndex = state.libraryIndex - 1
+                }
+
+                // Check if we have a valid previous track in library
+                if (prevLibraryIndex >= 0) {
+                  const prevTrack = state.libraryTracks[prevLibraryIndex]
+                  dispatch({ type: 'SET_LIBRARY_INDEX', payload: prevLibraryIndex })
+                  dispatch({ type: 'SET_CURRENT_TRACK', payload: prevTrack })
+                  if (state.isPlaying) {
+                    playingIntentRef.current = true
+                    dispatch({ type: 'SET_PLAYING', payload: true })
+                  }
                 }
               }
             }, 0)
@@ -569,13 +665,25 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       console.log('Playing new track:', track.title)
       dispatch({ type: 'SET_CURRENT_TRACK', payload: track })
 
-      // Add to queue if not already there
-      const existingIndex = state.queue.findIndex(t => t.id === track.id)
-      if (existingIndex === -1) {
-        dispatch({ type: 'ADD_TO_QUEUE', payload: track })
-        dispatch({ type: 'SET_CURRENT_INDEX', payload: state.queue.length })
+      // Only add to queue if the queue is not empty (user has explicitly added items)
+      // This allows library navigation when queue is empty
+      if (state.queue.length > 0) {
+        const existingIndex = state.queue.findIndex(t => t.id === track.id)
+        if (existingIndex === -1) {
+          dispatch({ type: 'ADD_TO_QUEUE', payload: track })
+          dispatch({ type: 'SET_CURRENT_INDEX', payload: state.queue.length })
+        } else {
+          dispatch({ type: 'SET_CURRENT_INDEX', payload: existingIndex })
+        }
       } else {
-        dispatch({ type: 'SET_CURRENT_INDEX', payload: existingIndex })
+        // Clear queue index when not using queue
+        dispatch({ type: 'SET_CURRENT_INDEX', payload: -1 })
+      }
+
+      // Update library index if this track is in the library
+      const libraryIndex = state.libraryTracks.findIndex(t => t.id === track.id)
+      if (libraryIndex >= 0) {
+        dispatch({ type: 'SET_LIBRARY_INDEX', payload: libraryIndex })
       }
 
       // Clear any previous error when playing a new track
@@ -685,7 +793,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         dispatch({ type: 'SET_PLAYING', payload: true })
       }
     }
-  }, [state.currentTrack, state.queue])
+  }, [state.currentTrack, state.queue, state.libraryTracks])
 
   const pause = useCallback(() => {
     if (audioRef.current) {
@@ -759,15 +867,53 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         setTimeout(() => play(nextTrack), 100)
       }
     } else {
-      // No next track
-      stop()
+      // No next track in queue, try library tracks as fallback
+      if (state.libraryTracks.length > 0) {
+        let nextLibraryIndex = -1
+
+        if (state.currentTrack) {
+          // Find current track in library
+          const currentLibraryIndex = state.libraryTracks.findIndex(t => t.id === state.currentTrack!.id)
+          if (currentLibraryIndex >= 0) {
+            nextLibraryIndex = currentLibraryIndex + 1
+          } else {
+            // Current track not in library, start from library index
+            nextLibraryIndex = state.libraryIndex + 1
+          }
+        } else {
+          // No current track, start from beginning or current library index
+          nextLibraryIndex = state.libraryIndex >= 0 ? state.libraryIndex + 1 : 0
+        }
+
+        // Check if we have a valid next track in library
+        if (nextLibraryIndex < state.libraryTracks.length) {
+          const nextTrack = state.libraryTracks[nextLibraryIndex]
+          dispatch({ type: 'SET_LIBRARY_INDEX', payload: nextLibraryIndex })
+          dispatch({ type: 'SET_CURRENT_TRACK', payload: nextTrack })
+
+          // Set playing intent directly instead of calling play() to avoid conflicts
+          if (state.isPlaying && hasUserInteractedRef.current) {
+            playingIntentRef.current = true
+            dispatch({ type: 'SET_PLAYING', payload: true })
+          }
+        } else {
+          // Reached end of library
+          stop()
+        }
+      } else {
+        // No library tracks available
+        stop()
+      }
     }
-  }, [getNextTrackIndex, state.queue, state.isPlaying, play, stop])
+  }, [getNextTrackIndex, state.queue, state.isPlaying, state.libraryTracks, state.libraryIndex, state.currentTrack, stop])
 
   const previous = useCallback(() => {
     // If we're more than 3 seconds into the track, restart current track
     if (state.currentTime > 3) {
-      seek(0)
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0
+        dispatch({ type: 'SET_CURRENT_TIME', payload: 0 })
+      }
       return
     }
 
@@ -781,8 +927,41 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       if (state.isPlaying && hasUserInteractedRef.current) {
         setTimeout(() => play(prevTrack), 100)
       }
+    } else {
+      // No previous track in queue, try library tracks as fallback
+      if (state.libraryTracks.length > 0) {
+        let prevLibraryIndex = -1
+
+        if (state.currentTrack) {
+          // Find current track in library
+          const currentLibraryIndex = state.libraryTracks.findIndex(t => t.id === state.currentTrack!.id)
+          if (currentLibraryIndex >= 0) {
+            prevLibraryIndex = currentLibraryIndex - 1
+          } else {
+            // Current track not in library, go to previous from library index
+            prevLibraryIndex = state.libraryIndex - 1
+          }
+        } else {
+          // No current track, go to previous from current library index
+          prevLibraryIndex = state.libraryIndex - 1
+        }
+
+        // Check if we have a valid previous track in library
+        if (prevLibraryIndex >= 0) {
+          const prevTrack = state.libraryTracks[prevLibraryIndex]
+          dispatch({ type: 'SET_LIBRARY_INDEX', payload: prevLibraryIndex })
+          dispatch({ type: 'SET_CURRENT_TRACK', payload: prevTrack })
+
+          // Set playing intent directly instead of calling play() to avoid conflicts
+          if (state.isPlaying && hasUserInteractedRef.current) {
+            playingIntentRef.current = true
+            dispatch({ type: 'SET_PLAYING', payload: true })
+          }
+        }
+        // If prevLibraryIndex < 0, we're at the beginning, do nothing
+      }
     }
-  }, [state.currentTime, state.isPlaying, getPreviousTrackIndex, state.queue, play])
+  }, [state.currentTime, state.isPlaying, getPreviousTrackIndex, state.queue, state.libraryTracks, state.libraryIndex, state.currentTrack])
 
   const seek = useCallback((time: number) => {
     if (audioRef.current) {
@@ -855,6 +1034,10 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     dispatch({ type: 'SET_ERROR', payload: null })
   }, [])
 
+  const setLibraryTracks = useCallback((tracks: Track[]) => {
+    dispatch({ type: 'SET_LIBRARY_TRACKS', payload: tracks })
+  }, [])
+
   const contextValue: AudioPlayerContextType = {
     ...state,
     play,
@@ -872,6 +1055,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     toggleShuffle,
     playFromQueue,
     clearError,
+    setLibraryTracks,
   }
 
   return (

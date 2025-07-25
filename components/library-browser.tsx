@@ -11,9 +11,10 @@ interface LibraryBrowserProps {
   onFilter: (type: string, value: string) => void
   stats: LibraryStats | null
   activeFilters: Record<string, string>
+  useCache?: boolean
 }
 
-export function LibraryBrowser({ onFilter, stats, activeFilters }: LibraryBrowserProps) {
+export function LibraryBrowser({ onFilter, stats, activeFilters, useCache = true }: LibraryBrowserProps) {
   const [artists, setArtists] = useState<string[]>([])
   const [albums, setAlbums] = useState<string[]>([])
   const [filteredAlbums, setFilteredAlbums] = useState<string[]>([])
@@ -27,11 +28,11 @@ export function LibraryBrowser({ onFilter, stats, activeFilters }: LibraryBrowse
     try {
       let data: string[]
       if (endpoint === 'artists') {
-        data = await apiService.getArtists()
+        data = await apiService.getArtists(useCache)
       } else if (endpoint === 'albums') {
-        data = await apiService.getAlbums()
+        data = await apiService.getAlbums(useCache)
       } else {
-        data = await apiService.getGenres()
+        data = await apiService.getGenres(useCache)
       }
       setter(data)
     } catch (error) {
@@ -45,7 +46,7 @@ export function LibraryBrowser({ onFilter, stats, activeFilters }: LibraryBrowse
   const fetchAlbumsForArtist = async (artist: string) => {
     setLoading(prev => ({ ...prev, albums: true }))
     try {
-      const data = await apiService.getAlbumsForArtist(artist)
+      const data = await apiService.getAlbumsForArtist(artist, useCache)
       setFilteredAlbums(data)
     } catch (error) {
       console.error('Error fetching albums for artist:', error)
@@ -81,7 +82,18 @@ export function LibraryBrowser({ onFilter, stats, activeFilters }: LibraryBrowse
     } else if (activeTab === 'genres' && genres.length === 0) {
       fetchData('genres', setGenres, 'genres')
     }
-  }, [activeTab, artists.length, albums.length, genres.length])
+  }, [activeTab, artists.length, albums.length, genres.length, useCache])
+
+  // Refresh data when cache mode changes
+  useEffect(() => {
+    if (activeTab === 'artists' && artists.length > 0) {
+      fetchData('artists', setArtists, 'artists')
+    } else if (activeTab === 'albums' && albums.length > 0) {
+      fetchData('albums', setAlbums, 'albums')
+    } else if (activeTab === 'genres' && genres.length > 0) {
+      fetchData('genres', setGenres, 'genres')
+    }
+  }, [useCache])
 
   // Update filtered albums when artist filter changes
   useEffect(() => {

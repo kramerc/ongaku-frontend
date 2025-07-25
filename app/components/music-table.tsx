@@ -16,6 +16,8 @@ interface MusicTableProps {
   loading: boolean
   loadingMore: boolean
   hasMorePages: boolean
+  allTracksLoaded: boolean
+  loadingProgress: { current: number; total: number; operation: string }
   onLoadMore: () => void
   formatDuration: (seconds: number) => string
 }
@@ -28,6 +30,8 @@ export function MusicTable({
   loading,
   loadingMore,
   hasMorePages,
+  allTracksLoaded,
+  loadingProgress,
   onLoadMore,
   formatDuration,
 }: MusicTableProps) {
@@ -35,8 +39,10 @@ export function MusicTable({
   const [sortDirection, setSortDirection] = useState<SortDirection>("asc")
   const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Infinite scroll effect
+  // Infinite scroll effect (only when not all tracks are loaded)
   useEffect(() => {
+    if (allTracksLoaded) return // Skip infinite scroll when all tracks are loaded
+
     const scrollContainer = scrollContainerRef.current
     if (!scrollContainer) return
 
@@ -50,7 +56,7 @@ export function MusicTable({
 
     scrollContainer.addEventListener('scroll', handleScroll)
     return () => scrollContainer.removeEventListener('scroll', handleScroll)
-  }, [hasMorePages, loadingMore, onLoadMore])
+  }, [hasMorePages, loadingMore, onLoadMore, allTracksLoaded])
 
   // Handle sorting
   const handleSort = (field: SortField) => {
@@ -132,9 +138,29 @@ export function MusicTable({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="flex flex-col items-center justify-center py-12">
         <Loader2 className="w-8 h-8 animate-spin" />
-        <span className="ml-2">Loading tracks...</span>
+        <div className="mt-3 text-center">
+          <div className="text-sm font-medium">
+            {loadingProgress.operation || "Loading tracks..."}
+          </div>
+          {loadingProgress.total > 0 && (
+            <div className="mt-2 space-y-1">
+              <div className="text-xs text-muted-foreground">
+                Page {loadingProgress.current} of {loadingProgress.total}
+              </div>
+              <div className="w-48 bg-secondary rounded-full h-2">
+                <div
+                  className="bg-primary h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${(loadingProgress.current / loadingProgress.total) * 100}%` }}
+                />
+              </div>
+              <div className="text-xs text-muted-foreground">
+                {Math.round((loadingProgress.current / loadingProgress.total) * 100)}% complete
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     )
   }
@@ -292,7 +318,7 @@ export function MusicTable({
               ))}
 
               {/* Loading more indicator */}
-              {loadingMore && (
+              {loadingMore && !allTracksLoaded && (
                 <TableRow key="loading-more">
                   <TableCell colSpan={10} className="text-center py-4">
                     <div className="flex items-center justify-center">

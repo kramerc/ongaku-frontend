@@ -1,4 +1,4 @@
-import { Track, TrackListResponse } from './types'
+import { Track } from './types'
 
 // IndexedDB cache for tracks
 class TrackCache {

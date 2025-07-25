@@ -20,7 +20,7 @@ export interface Track {
   sample_rate: number
   bit_depth: number
   channels: number
-  tags: Record<string, any>
+  tags: Record<string, string | number | boolean | null>
   created: string
   modified: string
 }

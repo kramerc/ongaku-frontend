@@ -28,6 +28,8 @@ export default function MusicLibrary() {
   const [useCache, setUseCache] = useState(true)
   const [allTracksLoaded, setAllTracksLoaded] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0, operation: "" })
+  const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0, operation: "" })
+  const [isSyncing, setIsSyncing] = useState(false)
   const [scrollResetTrigger, setScrollResetTrigger] = useState(false)
 
   const perPage = 50
@@ -232,16 +234,23 @@ export default function MusicLibrary() {
 
   // Sync cache with server
   const syncCache = async () => {
-    setLoading(true)
-    setLoadingProgress({ current: 0, total: 0, operation: "" })
+    setIsSyncing(true)
+    setSyncProgress({ current: 0, total: 0, operation: "" })
 
     try {
       const progressCallback = (current: number, total: number, operation: string) => {
-        setLoadingProgress({ current, total, operation })
+        setSyncProgress({ current, total, operation })
       }
 
       const syncResult = await apiService.syncCache(progressCallback)
       console.log('Cache sync result:', syncResult)
+
+      // Update sync progress to show completion before refreshing view
+      setSyncProgress({ current: 1, total: 1, operation: "Sync complete" })
+
+      // Small delay to show completion message
+      await new Promise(resolve => setTimeout(resolve, 500))
+
       // Refresh current view
       if (useCache) {
         loadAllTracks(searchQuery, activeFilters)
@@ -249,8 +258,8 @@ export default function MusicLibrary() {
     } catch (err) {
       console.error('Cache sync failed:', err)
     } finally {
-      setLoading(false)
-      setLoadingProgress({ current: 0, total: 0, operation: "" })
+      setIsSyncing(false)
+      setSyncProgress({ current: 0, total: 0, operation: "" })
     }
   }
 
@@ -264,8 +273,11 @@ export default function MusicLibrary() {
       setTimeout(async () => {
         await fetchStats()
         if (useCache) {
+          // Use a separate progress callback for rescan cache population
           const progressCallback = (current: number, total: number, operation: string) => {
-            setLoadingProgress({ current, total, operation })
+            // You could create a separate rescan progress state here if needed
+            // For now, we'll just log it to avoid conflicts
+            console.log(`Rescan progress: ${operation} (${current}/${total})`)
           }
           await apiService.populateCache(progressCallback) // Repopulate cache
           loadAllTracks(searchQuery, activeFilters)
@@ -292,20 +304,6 @@ export default function MusicLibrary() {
     return `${minutes}:${secs.toString().padStart(2, "0")}`
   }
 
-  // Format total duration for stats
-  const formatTotalDuration = (seconds: number) => {
-    const days = Math.floor(seconds / 86400)
-    const hours = Math.floor((seconds % 86400) / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-
-    if (days > 0) {
-      return `${days}d ${hours}h ${minutes}m`
-    } else if (hours > 0) {
-      return `${hours}h ${minutes}m`
-    }
-    return `${minutes}m`
-  }
-
   return (
     <div className="h-screen flex flex-col">
       {/* Header with Search Bar */}
@@ -320,12 +318,21 @@ export default function MusicLibrary() {
                 {totalTracks > tracks.length ? ` of ${totalTracks.toLocaleString()}` : ''} tracks
               </Badge>
             )}
-            {(loading || loadingMore) && loadingProgress.operation && (
+            {(loading || loadingMore) && loadingProgress.operation && !isSyncing && (
               <Badge variant="outline" className="text-xs flex items-center gap-1">
                 <Loader2 className="w-3 h-3 animate-spin" />
                 {loadingProgress.operation}
                 {loadingProgress.total > 0 && (
                   <span>({loadingProgress.current}/{loadingProgress.total})</span>
+                )}
+              </Badge>
+            )}
+            {isSyncing && syncProgress.operation && (
+              <Badge variant="outline" className="text-xs flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                {syncProgress.operation}
+                {syncProgress.total > 0 && (
+                  <span>({syncProgress.current}/{syncProgress.total})</span>
                 )}
               </Badge>
             )}
@@ -390,10 +397,10 @@ export default function MusicLibrary() {
                 size="sm"
                 className="h-8"
                 onClick={syncCache}
-                disabled={loading}
+                disabled={loading || isSyncing}
                 title="Sync cache with server"
               >
-                {loading ? (
+                {isSyncing ? (
                   <Loader2 className="w-3 h-3 animate-spin" />
                 ) : (
                   "Sync"

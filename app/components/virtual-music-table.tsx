@@ -106,6 +106,8 @@ const TrackRow = memo(({
   </TableRow>
 ))
 
+TrackRow.displayName = 'TrackRow'
+
 export function VirtualMusicTable({
   tracks,
   loading,

@@ -90,13 +90,13 @@ const TrackRow = memo(({
 
   const handleAddToQueue = (e: React.MouseEvent) => {
     e.stopPropagation()
-    
+
     // Validate track before adding to queue
     if (!track || !track.id) {
       console.error('Invalid track object:', track)
       return
     }
-    
+
     // Ensure track has meaningful metadata
     const trackToAdd = {
       ...track,
@@ -104,7 +104,7 @@ const TrackRow = memo(({
       artist: track.artist?.trim() || 'Unknown Artist',
       album: track.album?.trim() || 'Unknown Album'
     }
-    
+
     addToQueue(trackToAdd)
     // Simple visual feedback - you could replace this with a proper toast notification
     console.log(`Added "${trackToAdd.title}" to queue`)

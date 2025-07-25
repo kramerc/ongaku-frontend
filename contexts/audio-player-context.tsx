@@ -96,6 +96,23 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const hasUserInteractedRef = useRef(false)
   const playAttemptTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const playingIntentRef = useRef(false)
+  const retryCountRef = useRef(0)
+  const maxRetries = 3
+
+  // Helper function to retry loading audio after abort
+  const retryAudioLoad = useCallback(() => {
+    if (!audioRef.current || !state.currentTrack || retryCountRef.current >= maxRetries) {
+      console.log('Max retries reached or no audio context available')
+      return
+    }
+
+    retryCountRef.current += 1
+    console.log(`Retrying audio load (attempt ${retryCountRef.current}/${maxRetries})`)
+
+    const audio = audioRef.current
+    // Force reload the audio
+    audio.load()
+  }, [state.currentTrack, maxRetries])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -120,6 +137,9 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     const handleLoadedMetadata = () => {
       dispatch({ type: 'SET_DURATION', payload: audio.duration })
 
+      // Reset retry counter on successful load
+      retryCountRef.current = 0
+
       console.log('loadedmetadata event fired', {
         duration: audio.duration,
         isPlaying: state.isPlaying,
@@ -136,9 +156,29 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
           console.log('Successfully resumed playback after loading metadata')
         }).catch(error => {
           console.warn('Failed to auto-play after loading metadata:', error)
+
+          // Handle different types of errors more specifically
+          let errorMessage = 'Failed to start playback - please click play'
+          if (error.name === 'AbortError' || error.message.includes('aborted')) {
+            if (retryCountRef.current < maxRetries) {
+              errorMessage = `Audio loading interrupted, retrying... (${retryCountRef.current + 1}/${maxRetries})`
+              console.log('Audio loading aborted, scheduling retry')
+              setTimeout(() => retryAudioLoad(), 1000) // Retry after 1 second
+              dispatch({ type: 'SET_ERROR', payload: errorMessage })
+              return // Don't reset playing intent, we're retrying
+            } else {
+              errorMessage = 'Audio loading failed after multiple attempts - please try again'
+            }
+            playingIntentRef.current = false
+          } else if (error.name === 'NotAllowedError' || error.message.includes('user didn\'t interact')) {
+            errorMessage = 'Click play button to start audio (browser autoplay blocked)'
+            playingIntentRef.current = false
+          } else {
+            playingIntentRef.current = false
+          }
+
           dispatch({ type: 'SET_PLAYING', payload: false })
-          playingIntentRef.current = false
-          dispatch({ type: 'SET_ERROR', payload: 'Failed to start playback - please click play' })
+          dispatch({ type: 'SET_ERROR', payload: errorMessage })
         })
       }
     }
@@ -166,9 +206,29 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
           console.log('Successfully started playback from canplay event')
         }).catch(error => {
           console.warn('Failed to auto-play on canplay:', error)
+
+          // Handle different types of errors more specifically
+          let errorMessage = 'Failed to start playback - please try again'
+          if (error.name === 'AbortError' || error.message.includes('aborted')) {
+            if (retryCountRef.current < maxRetries) {
+              errorMessage = `Audio loading interrupted, retrying... (${retryCountRef.current + 1}/${maxRetries})`
+              console.log('Audio loading aborted during canplay, scheduling retry')
+              setTimeout(() => retryAudioLoad(), 1000) // Retry after 1 second
+              dispatch({ type: 'SET_ERROR', payload: errorMessage })
+              return // Don't reset playing intent, we're retrying
+            } else {
+              errorMessage = 'Audio loading failed after multiple attempts - please try again'
+            }
+            playingIntentRef.current = false
+          } else if (error.name === 'NotAllowedError' || error.message.includes('user didn\'t interact')) {
+            errorMessage = 'Click play button to start audio (browser autoplay blocked)'
+            playingIntentRef.current = false
+          } else {
+            playingIntentRef.current = false
+          }
+
           dispatch({ type: 'SET_PLAYING', payload: false })
-          playingIntentRef.current = false
-          dispatch({ type: 'SET_ERROR', payload: 'Failed to start playback - please try again' })
+          dispatch({ type: 'SET_ERROR', payload: errorMessage })
         })
       }
     }
@@ -421,6 +481,9 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         audio.currentTime = 0
         dispatch({ type: 'SET_CURRENT_TIME', payload: 0 })
 
+        // Reset retry counter for new track
+        retryCountRef.current = 0
+
         // Set new source
         audio.src = newSrc
 
@@ -579,21 +642,38 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
 
             // Set user-friendly error message based on error type
             let userErrorMessage = errorMessage
-            if (errorMessage.includes('user didn\'t interact') ||
+            if (error?.name === 'AbortError' || errorMessage.includes('aborted')) {
+              if (retryCountRef.current < maxRetries) {
+                userErrorMessage = `Audio loading interrupted, retrying... (${retryCountRef.current + 1}/${maxRetries})`
+                console.log('Audio loading aborted in play function, scheduling retry')
+                setTimeout(() => retryAudioLoad(), 1000) // Retry after 1 second
+                dispatch({ type: 'SET_PLAYING', payload: false })
+                dispatch({ type: 'SET_ERROR', payload: userErrorMessage })
+                return // Don't reset playing intent, we're retrying
+              } else {
+                userErrorMessage = 'Audio loading failed after multiple attempts - please try again'
+              }
+              playingIntentRef.current = false
+            } else if (errorMessage.includes('user didn\'t interact') ||
                 errorMessage.includes('NotAllowedError') ||
                 errorMessage.includes('play() request was interrupted')) {
               userErrorMessage = 'Autoplay blocked - click play button to start audio'
+              playingIntentRef.current = false
             } else if (errorMessage.includes('network') || errorMessage.includes('NetworkError')) {
               userErrorMessage = 'Network error - check your connection'
+              playingIntentRef.current = false
             } else if (errorMessage.includes('decode') || errorMessage.includes('MediaError')) {
               userErrorMessage = 'Audio format not supported'
+              playingIntentRef.current = false
             } else if (errorMessage.includes('not suitable') || errorMessage.includes('MEDIA_ERR_SRC_NOT_SUPPORTED')) {
               userErrorMessage = 'Audio source not ready - please try again'
+              playingIntentRef.current = false
+            } else {
+              playingIntentRef.current = false
             }
 
             // Reset playing state and set error
             dispatch({ type: 'SET_PLAYING', payload: false })
-            playingIntentRef.current = false
             dispatch({ type: 'SET_ERROR', payload: userErrorMessage })
           }
         }
@@ -726,7 +806,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       console.error('Invalid track object passed to addToQueue:', track)
       return
     }
-    
+
     const existingIndex = state.queue.findIndex(t => t.id === track.id)
     if (existingIndex === -1) {
       dispatch({ type: 'ADD_TO_QUEUE', payload: track })

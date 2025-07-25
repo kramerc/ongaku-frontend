@@ -72,8 +72,23 @@ export function MusicTable({
   const sortedTracks = [...tracks].sort((a, b) => {
     // Special sorting for album field
     if (sortField === "album") {
-      // First compare album names
-      const albumComparison = a.album.localeCompare(b.album)
+      // Handle empty/unknown albums - put them at the bottom
+      const aAlbum = a.album || ""
+      const bAlbum = b.album || ""
+
+      const aIsUnknown = !aAlbum
+      const bIsUnknown = !bAlbum
+
+      // If one is unknown and the other isn't, put unknown at the bottom
+      if (aIsUnknown && !bIsUnknown) {
+        return sortDirection === "asc" ? 1 : -1
+      }
+      if (!aIsUnknown && bIsUnknown) {
+        return sortDirection === "asc" ? -1 : 1
+      }
+
+      // If both are unknown or both are known, compare normally
+      const albumComparison = aAlbum.localeCompare(bAlbum)
       if (albumComparison !== 0) {
         return sortDirection === "asc" ? albumComparison : -albumComparison
       }

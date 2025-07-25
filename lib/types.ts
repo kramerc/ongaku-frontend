@@ -21,6 +21,9 @@ export interface Track {
   bit_depth: number
   channels: number
   tags: Record<string, string | number | boolean | null>
+  album_art_path?: string | null
+  album_art_mime_type?: string | null
+  album_art_size?: number | null
   created: string
   modified: string
 }

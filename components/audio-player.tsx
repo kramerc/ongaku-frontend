@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
+import { AlbumArt } from '@/components/ui/album-art'
 import {
   Play,
   Pause,
@@ -18,7 +18,6 @@ import {
   X
 } from 'lucide-react'
 import { useAudioPlayer } from '@/contexts/audio-player-context'
-import { Track } from '@/lib/types'
 
 interface AudioPlayerProps {
   formatDuration: (seconds: number) => string
@@ -37,7 +36,6 @@ export function AudioPlayer({ formatDuration }: AudioPlayerProps) {
     shuffle,
     error,
     libraryTracks,
-    libraryIndex,
     play,
     pause,
     next,
@@ -53,7 +51,6 @@ export function AudioPlayer({ formatDuration }: AudioPlayerProps) {
   } = useAudioPlayer()
 
   const [showQueue, setShowQueue] = useState(false)
-  const [isDragging, setIsDragging] = useState(false)
   const [connectionError, setConnectionError] = useState<string | null>(null)
 
   // Test audio connection
@@ -197,13 +194,14 @@ export function AudioPlayer({ formatDuration }: AudioPlayerProps) {
                 }`}
                 onClick={() => playFromQueue(index)}
               >
-                <div className="w-6 text-center text-xs text-muted-foreground">
+                <div className="w-6 text-center text-xs text-muted-foreground flex items-center justify-center">
                   {index === currentIndex && isPlaying ? (
                     <Music className="w-3 h-3 text-primary" />
                   ) : (
                     index + 1
                   )}
                 </div>
+                <AlbumArt track={track} size="sm" className="w-8 h-8" />
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{track.title}</div>
                   <div className="text-muted-foreground truncate">{track.artist}</div>
@@ -244,9 +242,7 @@ export function AudioPlayer({ formatDuration }: AudioPlayerProps) {
         <div className="flex items-center justify-between">
           {/* Track Info */}
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
-              <Music className="w-5 h-5 text-muted-foreground" />
-            </div>
+            <AlbumArt track={currentTrack} size="sm" />
             <div className="min-w-0 flex-1">
               <div className="font-medium text-sm truncate">{currentTrack.title}</div>
               <div className="text-xs text-muted-foreground truncate">

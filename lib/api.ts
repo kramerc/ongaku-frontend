@@ -298,6 +298,11 @@ class ApiService {
   getAudioStreamUrl(trackId: number): string {
     return `${this.baseUrl}/tracks/${trackId}/play`
   }
+
+  // Get album art URL for a track
+  getAlbumArtUrl(trackId: number): string {
+    return `${this.baseUrl}/tracks/${trackId}/albumart`
+  }
 }
 
 // Export singleton instance

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { AlbumArt } from "@/components/ui/album-art"
 import {
   ArrowUpDown,
   ArrowUp,
@@ -196,6 +197,7 @@ export function MusicTable({
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
+                <TableHead className="w-[60px]">Art</TableHead>
                 <TableHead
                   className="cursor-pointer hover:bg-muted/50 select-none min-w-[200px]"
                   onClick={() => handleSort("title")}
@@ -283,6 +285,9 @@ export function MusicTable({
             <TableBody>
               {sortedTracks.map((track, index) => (
                 <TableRow key={`${track.id}-${index}`} className="hover:bg-muted/50">
+                  <TableCell>
+                    <AlbumArt track={track} size="sm" />
+                  </TableCell>
                   <TableCell className="font-medium">
                     <div className="truncate" title={track.title}>
                       {track.title || "Unknown Title"}

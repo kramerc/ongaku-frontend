@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback, memo } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import { AlbumArt } from "@/components/ui/album-art"
 import {
   ArrowUpDown,
   ArrowUp,
@@ -37,6 +38,7 @@ const OVERSCAN = 5 // Number of extra rows to render outside viewport
 
 // Fixed column widths to ensure header and body alignment
 const COLUMN_WIDTHS = {
+  albumArt: 60,
   actions: 100,
   title: 200,
   artist: 150,
@@ -110,20 +112,11 @@ const TrackRow = memo(({
     console.log(`Added "${trackToAdd.title}" to queue`)
   }
 
-  const handlePlayAll = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    // Normalize track data before adding to queue
-    const normalizedTracks = tracks.map(t => ({
-      ...t,
-      title: t.title?.trim() || 'Unknown Title',
-      artist: t.artist?.trim() || 'Unknown Artist',
-      album: t.album?.trim() || 'Unknown Album'
-    }))
-    addAllToQueue(normalizedTracks, index)
-  }
-
   return (
     <TableRow key={`${track.id}-${index}`} className="hover:bg-muted/50" style={{ height: ROW_HEIGHT }}>
+      <TableCell style={{ width: COLUMN_WIDTHS.albumArt }}>
+        <AlbumArt track={track} size="sm" />
+      </TableCell>
       <TableCell style={{ width: COLUMN_WIDTHS.actions }}>
         <div className="flex items-center gap-1">
           <Button
@@ -489,6 +482,7 @@ export function VirtualMusicTable({
               <Table style={{ tableLayout: 'fixed' }}>
                 <TableHeader>
                   <TableRow>
+                    <TableHead style={{ width: COLUMN_WIDTHS.albumArt }}>Art</TableHead>
                     <TableHead style={{ width: COLUMN_WIDTHS.actions }}>Actions</TableHead>
                     <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"

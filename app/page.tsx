@@ -123,25 +123,25 @@ export default function MusicLibrary() {
     setLoadingProgress({ current: 0, total: 0, operation: "" })
 
     try {
-      let data: TrackListResponse
-
       const progressCallback = (current: number, total: number, operation: string) => {
         setLoadingProgress({ current, total, operation })
       }
 
+      let data: TrackListResponse
+
       if (query && query.trim()) {
-        // Get all search results
+        // Get all search results from cache in one call
         data = await apiService.searchTracksWithCache({
           q: query.trim(),
           page: 1,
-          per_page: 10000 // Large number to get all results
+          per_page: 999999 // Get all results from cache
         }, useCache, progressCallback)
       } else {
-        // Get all tracks with filters
+        // Get all tracks with filters from cache in one call
         const currentFilters = filters || activeFilters
         data = await apiService.getTracksWithCache({
           page: 1,
-          per_page: 10000, // Large number to get all results
+          per_page: 999999, // Get all results from cache
           ...currentFilters
         }, useCache, progressCallback)
       }

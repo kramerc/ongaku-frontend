@@ -51,7 +51,7 @@ export interface ApiError {
 }
 
 // API Configuration
-export const API_BASE_URL = "http://localhost:3000/api/v1"
+export const API_BASE_URL = "http://localhost:4000/api/v1"
 
 // Filter types for track queries
 export interface TrackFilters {

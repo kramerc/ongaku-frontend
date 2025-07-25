@@ -63,13 +63,13 @@ This frontend is fully integrated with the Ongaku Music Server API v1.0.0:
    npm run dev
    ```
 
-4. Open [http://localhost:3001](http://localhost:3001) in your browser
+4. Open [http://localhost:3000](http://localhost:3000) in your browser
 
 ### Configuration
 
 The API base URL is configured in `/lib/types.ts`:
 ```typescript
-export const API_BASE_URL = "http://localhost:3000/api/v1"
+export const API_BASE_URL = "http://localhost:4000/api/v1"
 ```
 
 Update this if your Ongaku server is running on a different host/port.

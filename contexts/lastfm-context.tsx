@@ -31,35 +31,9 @@ export function LastfmProvider({ children }: { children: React.ReactNode }) {
 
   // Load saved settings and initialize service on mount
   useEffect(() => {
-    // Initialize the Last.fm service
-    const apiKey = process.env.NEXT_PUBLIC_LASTFM_API_KEY
-    const secret = process.env.NEXT_PUBLIC_LASTFM_SECRET
-
-    if (apiKey && secret) {
-      lastFmService.init({
-        apiKey,
-        secret,
-        callbackUrl: `${window.location.origin}/lastfm/callback`
-      })
-      console.log('🚀 LastfmContext: Service initialized with API credentials')
-    } else {
-      console.error('❌ LastfmContext: Missing API credentials in environment variables')
-    }
-
-    // Load saved settings
-    const savedSettings = localStorage.getItem('lastfm-settings')
-    if (savedSettings) {
-      try {
-        const parsed = JSON.parse(savedSettings)
-        setSettings(parsed)
-        console.log('📁 LastfmContext: Loaded settings from localStorage:', parsed)
-      } catch (error) {
-        console.error('❌ LastfmContext: Failed to parse saved settings:', error)
-      }
-    }
-  }, [])  // Initialize Last.fm service on mount
-  useEffect(() => {
     console.log('🔧 LastfmContext: Initializing Last.fm service...')
+
+    // Initialize the Last.fm service
     const apiKey = process.env.NEXT_PUBLIC_LASTFM_API_KEY
     const secret = process.env.NEXT_PUBLIC_LASTFM_SECRET
 
@@ -69,23 +43,37 @@ export function LastfmProvider({ children }: { children: React.ReactNode }) {
         secret,
         callbackUrl: typeof window !== 'undefined' ? `${window.location.origin}/lastfm/callback` : undefined,
       })
-
-      // If we have a session key, set it in the service
-      if (settings.sessionKey) {
-        console.log('🔑 LastfmContext: Setting existing session key in service')
-        lastFmService.setSessionKey(settings.sessionKey)
-      }
-
-      console.log('✅ LastfmContext: Service initialized successfully')
+      console.log('🚀 LastfmContext: Service initialized with API credentials')
     } else {
-      console.warn('⚠️ LastfmContext: API credentials not found in environment variables')
+      console.error('❌ LastfmContext: Missing API credentials in environment variables')
     }
-  }, [settings.sessionKey])
+
+    // Load saved settings
+    const savedSettings = localStorage.getItem(LASTFM_STORAGE_KEY)
+    if (savedSettings) {
+      try {
+        const parsed = JSON.parse(savedSettings)
+        setSettings(parsed)
+        console.log('📁 LastfmContext: Loaded settings from localStorage:', parsed)
+
+        // If we have a session key, set it in the service
+        if (parsed.sessionKey) {
+          console.log('🔑 LastfmContext: Setting existing session key in service')
+          lastFmService.setSessionKey(parsed.sessionKey)
+        }
+      } catch (error) {
+        console.error('❌ LastfmContext: Failed to parse saved settings:', error)
+      }
+    }
+
+    console.log('✅ LastfmContext: Initialization complete')
+  }, [])
 
   // Save settings to localStorage whenever they change
   useEffect(() => {
     try {
       localStorage.setItem(LASTFM_STORAGE_KEY, JSON.stringify(settings))
+      console.log('💾 LastfmContext: Saved settings to localStorage:', settings)
     } catch (error) {
       console.warn('Failed to save Last.fm settings to localStorage:', error)
     }

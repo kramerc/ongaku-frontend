@@ -93,12 +93,18 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const timeUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const isMountedRef = useRef(true)
+  const hasUserInteractedRef = useRef(false)
+  const playAttemptTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const playingIntentRef = useRef(false)
 
   // Cleanup on unmount
   useEffect(() => {
     isMountedRef.current = true
     return () => {
       isMountedRef.current = false
+      if (playAttemptTimeoutRef.current) {
+        clearTimeout(playAttemptTimeoutRef.current)
+      }
     }
   }, [])
 
@@ -106,16 +112,106 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     audioRef.current = new Audio()
     audioRef.current.volume = state.volume
+    audioRef.current.preload = 'metadata'
+    audioRef.current.crossOrigin = 'anonymous'
 
     const audio = audioRef.current
 
     const handleLoadedMetadata = () => {
       dispatch({ type: 'SET_DURATION', payload: audio.duration })
+
+      console.log('loadedmetadata event fired', {
+        duration: audio.duration,
+        isPlaying: state.isPlaying,
+        playingIntent: playingIntentRef.current,
+        paused: audio.paused,
+        hasUserInteracted: hasUserInteractedRef.current,
+        readyState: audio.readyState
+      })
+
+      // If we have a playing intent but audio isn't playing, start playing now
+      if (playingIntentRef.current && audio.paused && hasUserInteractedRef.current) {
+        console.log('Audio loaded, attempting to play as requested')
+        audio.play().then(() => {
+          console.log('Successfully resumed playback after loading metadata')
+        }).catch(error => {
+          console.warn('Failed to auto-play after loading metadata:', error)
+          dispatch({ type: 'SET_PLAYING', payload: false })
+          playingIntentRef.current = false
+          dispatch({ type: 'SET_ERROR', payload: 'Failed to start playback - please click play' })
+        })
+      }
+    }
+
+    const handleCanPlay = () => {
+      // Audio is ready to play, if we have a play intent and user has interacted, start playing
+      console.log('canplay event fired', {
+        isPlaying: state.isPlaying,
+        playingIntent: playingIntentRef.current,
+        paused: audio.paused,
+        hasUserInteracted: hasUserInteractedRef.current,
+        readyState: audio.readyState
+      })
+
+      if (playingIntentRef.current && audio.paused && hasUserInteractedRef.current) {
+        console.log('Audio can play, attempting to start playback')
+
+        // Clear any pending play attempts
+        if (playAttemptTimeoutRef.current) {
+          clearTimeout(playAttemptTimeoutRef.current)
+        }
+
+        // Attempt to play immediately since audio is ready
+        audio.play().then(() => {
+          console.log('Successfully started playback from canplay event')
+        }).catch(error => {
+          console.warn('Failed to auto-play on canplay:', error)
+          dispatch({ type: 'SET_PLAYING', payload: false })
+          playingIntentRef.current = false
+          dispatch({ type: 'SET_ERROR', payload: 'Failed to start playback - please try again' })
+        })
+      }
     }
 
     const handleEnded = () => {
       dispatch({ type: 'SET_PLAYING', payload: false })
-      next()
+      // Don't call next() directly here to avoid dependency issues
+      // Instead, handle next track logic inline
+      setTimeout(() => {
+        if (state.queue.length === 0) return
+
+        let nextIndex = -1
+        if (state.repeat === 'one') {
+          nextIndex = state.currentIndex
+        } else if (state.shuffle) {
+          // Simple shuffle: pick a random track that's not the current one
+          const availableIndices = state.queue
+            .map((_, index) => index)
+            .filter(index => index !== state.currentIndex)
+
+          if (availableIndices.length === 0) {
+            nextIndex = state.repeat === 'all' ? 0 : -1
+          } else {
+            nextIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)]
+          }
+        } else {
+          const nextIdx = state.currentIndex + 1
+          if (nextIdx >= state.queue.length) {
+            nextIndex = state.repeat === 'all' ? 0 : -1
+          } else {
+            nextIndex = nextIdx
+          }
+        }
+
+        if (nextIndex >= 0 && state.queue[nextIndex]) {
+          const nextTrack = state.queue[nextIndex]
+          dispatch({ type: 'SET_CURRENT_INDEX', payload: nextIndex })
+          dispatch({ type: 'SET_CURRENT_TRACK', payload: nextTrack })
+          if (hasUserInteractedRef.current) {
+            dispatch({ type: 'SET_PLAYING', payload: true })
+          }
+        }
+      }, 100)
     }
 
     const handleError = (e: Event) => {
@@ -135,7 +231,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
             errorMessage = 'Audio decoding error'
             break
           case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-            errorMessage = 'Audio format not supported'
+            errorMessage = 'Audio format not supported or source not ready'
             break
           default:
             errorMessage = `Audio error (code: ${error.code})`
@@ -148,7 +244,8 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         currentTrack: state.currentTrack,
         audioSrc: audio.src,
         networkState: audio.networkState,
-        readyState: audio.readyState
+        readyState: audio.readyState,
+        errorCode: error?.code
       })
 
       dispatch({ type: 'SET_PLAYING', payload: false })
@@ -169,8 +266,11 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       })
     }
 
-    // Global keyboard shortcuts
+    // Global keyboard shortcuts and user interaction detection
     const handleKeyPress = (e: KeyboardEvent) => {
+      // Mark user interaction
+      hasUserInteractedRef.current = true
+
       // Only handle shortcuts when not in an input field
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
         return
@@ -179,41 +279,121 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       switch (e.code) {
         case 'Space':
           e.preventDefault()
-          if (state.isPlaying) {
-            pause()
-          } else {
-            play()
+          if (audioRef.current) {
+            if (audioRef.current.paused) {
+              audioRef.current.play().catch(console.warn)
+              dispatch({ type: 'SET_PLAYING', payload: true })
+            } else {
+              audioRef.current.pause()
+              dispatch({ type: 'SET_PLAYING', payload: false })
+            }
           }
           break
         case 'ArrowRight':
           if (e.shiftKey) {
             e.preventDefault()
-            next()
+            // Trigger next track without calling the function directly
+            setTimeout(() => {
+              // Use the same logic as handleEnded but for next
+              if (state.queue.length === 0) return
+
+              let nextIndex = -1
+              if (state.repeat === 'one') {
+                nextIndex = state.currentIndex
+              } else if (state.shuffle) {
+                const availableIndices = state.queue
+                  .map((_, index) => index)
+                  .filter(index => index !== state.currentIndex)
+
+                if (availableIndices.length === 0) {
+                  nextIndex = state.repeat === 'all' ? 0 : -1
+                } else {
+                  nextIndex = availableIndices[Math.floor(Math.random() * availableIndices.length)]
+                }
+              } else {
+                const nextIdx = state.currentIndex + 1
+                if (nextIdx >= state.queue.length) {
+                  nextIndex = state.repeat === 'all' ? 0 : -1
+                } else {
+                  nextIndex = nextIdx
+                }
+              }
+
+              if (nextIndex >= 0 && state.queue[nextIndex]) {
+                const nextTrack = state.queue[nextIndex]
+                dispatch({ type: 'SET_CURRENT_INDEX', payload: nextIndex })
+                dispatch({ type: 'SET_CURRENT_TRACK', payload: nextTrack })
+                if (state.isPlaying) {
+                  dispatch({ type: 'SET_PLAYING', payload: true })
+                }
+              }
+            }, 0)
           }
           break
         case 'ArrowLeft':
           if (e.shiftKey) {
             e.preventDefault()
-            previous()
+            // Trigger previous track
+            setTimeout(() => {
+              if (audioRef.current && audioRef.current.currentTime > 3) {
+                audioRef.current.currentTime = 0
+                dispatch({ type: 'SET_CURRENT_TIME', payload: 0 })
+                return
+              }
+
+              if (state.queue.length === 0) return
+
+              let prevIndex = -1
+              if (state.repeat === 'one') {
+                prevIndex = state.currentIndex
+              } else {
+                const prevIdx = state.currentIndex - 1
+                if (prevIdx < 0) {
+                  prevIndex = state.repeat === 'all' ? state.queue.length - 1 : -1
+                } else {
+                  prevIndex = prevIdx
+                }
+              }
+
+              if (prevIndex >= 0 && state.queue[prevIndex]) {
+                const prevTrack = state.queue[prevIndex]
+                dispatch({ type: 'SET_CURRENT_INDEX', payload: prevIndex })
+                dispatch({ type: 'SET_CURRENT_TRACK', payload: prevTrack })
+                if (state.isPlaying) {
+                  dispatch({ type: 'SET_PLAYING', payload: true })
+                }
+              }
+            }, 0)
           }
           break
       }
     }
 
+    // Track user interactions to handle autoplay restrictions
+    const handleUserInteraction = () => {
+      hasUserInteractedRef.current = true
+    }
+
     audio.addEventListener('loadedmetadata', handleLoadedMetadata)
+    audio.addEventListener('canplay', handleCanPlay)
     audio.addEventListener('ended', handleEnded)
     audio.addEventListener('error', handleError)
     audio.addEventListener('abort', handleAbort)
     audio.addEventListener('loadstart', handleLoadStart)
     document.addEventListener('keydown', handleKeyPress)
+    document.addEventListener('click', handleUserInteraction)
+    document.addEventListener('touchstart', handleUserInteraction)
 
     return () => {
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      audio.removeEventListener('canplay', handleCanPlay)
       audio.removeEventListener('ended', handleEnded)
       audio.removeEventListener('error', handleError)
       audio.removeEventListener('abort', handleAbort)
       audio.removeEventListener('loadstart', handleLoadStart)
       document.removeEventListener('keydown', handleKeyPress)
+      document.removeEventListener('click', handleUserInteraction)
+      document.removeEventListener('touchstart', handleUserInteraction)
       audio.pause()
       audio.src = ''
     }
@@ -239,11 +419,12 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         // Pause current playback and reset
         audio.pause()
         audio.currentTime = 0
+        dispatch({ type: 'SET_CURRENT_TIME', payload: 0 })
 
-        // Set new source and load
+        // Set new source
         audio.src = newSrc
 
-        // Only load if component is still mounted
+        // Load the new audio source
         if (isMountedRef.current) {
           audio.load()
         }
@@ -253,6 +434,9 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       const audio = audioRef.current
       audio.pause()
       audio.src = ''
+      dispatch({ type: 'SET_PLAYING', payload: false })
+      dispatch({ type: 'SET_CURRENT_TIME', payload: 0 })
+      dispatch({ type: 'SET_DURATION', payload: 0 })
     }
   }, [state.currentTrack])
 
@@ -262,6 +446,38 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       audioRef.current.volume = state.volume
     }
   }, [state.volume])
+
+  // Handle playing state changes
+  useEffect(() => {
+    if (audioRef.current && state.currentTrack) {
+      const audio = audioRef.current
+
+      if (playingIntentRef.current && audio.paused && hasUserInteractedRef.current) {
+        // We want to play but audio is paused - try to play
+        console.log('Playing state effect triggered, attempting to play', {
+          readyState: audio.readyState,
+          src: audio.src,
+          currentTrack: state.currentTrack.title,
+          playingIntent: playingIntentRef.current
+        })
+
+        if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+          audio.play().catch(error => {
+            console.warn('Failed to start playback in state effect:', error)
+            dispatch({ type: 'SET_PLAYING', payload: false })
+            playingIntentRef.current = false
+            dispatch({ type: 'SET_ERROR', payload: 'Failed to start playback - please try again' })
+          })
+        } else {
+          // Audio not ready yet, wait a bit and try again
+          console.log('Audio not ready, will retry when canplay event fires')
+        }
+      } else if (!playingIntentRef.current && !audio.paused) {
+        // We want to pause but audio is playing - pause it
+        audio.pause()
+      }
+    }
+  }, [state.isPlaying, state.currentTrack])
 
   // Start/stop time updates based on playing state
   useEffect(() => {
@@ -285,9 +501,12 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     }
   }, [state.isPlaying])
 
-  const play = useCallback((track?: Track) => {
+  const play = useCallback(async (track?: Track) => {
+    console.log('play() called with:', { track: track?.title, currentTrack: state.currentTrack?.title })
+
     if (track && track.id !== state.currentTrack?.id) {
       // Playing a new track
+      console.log('Playing new track:', track.title)
       dispatch({ type: 'SET_CURRENT_TRACK', payload: track })
 
       // Add to queue if not already there
@@ -298,39 +517,96 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       } else {
         dispatch({ type: 'SET_CURRENT_INDEX', payload: existingIndex })
       }
+
+      // Clear any previous error when playing a new track
+      dispatch({ type: 'SET_ERROR', payload: null })
+
+      // Mark user interaction when play is called explicitly
+      hasUserInteractedRef.current = true
+
+      // Set playing intent - the actual play will happen when audio is loaded
+      console.log('Setting playing state to true for new track')
+      playingIntentRef.current = true
+      dispatch({ type: 'SET_PLAYING', payload: true })
+      return
     }
 
+    console.log('Resuming current track or no track parameter provided')
     if (audioRef.current && isMountedRef.current) {
       const audio = audioRef.current
 
+      // Ensure we have a valid source
+      if (!audio.src || audio.src === window.location.href) {
+        console.warn('No valid audio source available')
+        dispatch({ type: 'SET_ERROR', payload: 'No audio source available' })
+        return
+      }
+
       // Check if audio is ready to play
-      if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA || audio.src) {
-        audio.play().then(() => {
+      if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        try {
+          // Mark user interaction when play is called explicitly
+          hasUserInteractedRef.current = true
+          playingIntentRef.current = true
+
+          console.log('Audio ready, attempting to play immediately')
+          await audio.play()
+
           if (isMountedRef.current) {
             console.log('Audio playback started successfully')
             dispatch({ type: 'SET_PLAYING', payload: true })
+            dispatch({ type: 'SET_ERROR', payload: null })
           }
-        }).catch(error => {
+        } catch (error: any) {
           if (isMountedRef.current) {
-            console.error('Failed to play audio:', {
-              error: error.message,
-              name: error.name,
-              currentTrack: state.currentTrack,
+            const errorMessage = error?.message || error?.toString() || 'Unknown playback error'
+            const errorDetails = {
+              message: errorMessage,
+              name: error?.name || 'UnknownError',
+              code: error?.code,
+              currentTrack: state.currentTrack?.title,
               audioSrc: audio.src,
               readyState: audio.readyState,
-              networkState: audio.networkState
-            })
+              networkState: audio.networkState,
+              paused: audio.paused,
+              ended: audio.ended,
+              duration: audio.duration,
+              currentTime: audio.currentTime,
+              hasUserInteracted: hasUserInteractedRef.current
+            }
 
-            // Reset playing state on error
+            console.error('Failed to play audio:', errorDetails)
+
+            // Set user-friendly error message based on error type
+            let userErrorMessage = errorMessage
+            if (errorMessage.includes('user didn\'t interact') ||
+                errorMessage.includes('NotAllowedError') ||
+                errorMessage.includes('play() request was interrupted')) {
+              userErrorMessage = 'Autoplay blocked - click play button to start audio'
+            } else if (errorMessage.includes('network') || errorMessage.includes('NetworkError')) {
+              userErrorMessage = 'Network error - check your connection'
+            } else if (errorMessage.includes('decode') || errorMessage.includes('MediaError')) {
+              userErrorMessage = 'Audio format not supported'
+            } else if (errorMessage.includes('not suitable') || errorMessage.includes('MEDIA_ERR_SRC_NOT_SUPPORTED')) {
+              userErrorMessage = 'Audio source not ready - please try again'
+            }
+
+            // Reset playing state and set error
             dispatch({ type: 'SET_PLAYING', payload: false })
+            playingIntentRef.current = false
+            dispatch({ type: 'SET_ERROR', payload: userErrorMessage })
           }
-        })
+        }
       } else {
-        console.warn('Audio not ready to play:', {
+        console.warn('Audio not ready to play, waiting for load:', {
           readyState: audio.readyState,
           src: audio.src,
           currentTrack: state.currentTrack
         })
+
+        // Set playing intent - the audio will start playing once it's loaded
+        playingIntentRef.current = true
+        dispatch({ type: 'SET_PLAYING', payload: true })
       }
     }
   }, [state.currentTrack, state.queue])
@@ -338,6 +614,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const pause = useCallback(() => {
     if (audioRef.current) {
       audioRef.current.pause()
+      playingIntentRef.current = false
       dispatch({ type: 'SET_PLAYING', payload: false })
     }
   }, [])
@@ -397,12 +674,13 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   const next = useCallback(() => {
     const nextIndex = getNextTrackIndex()
     if (nextIndex >= 0 && state.queue[nextIndex]) {
+      const nextTrack = state.queue[nextIndex]
       dispatch({ type: 'SET_CURRENT_INDEX', payload: nextIndex })
-      dispatch({ type: 'SET_CURRENT_TRACK', payload: state.queue[nextIndex] })
+      dispatch({ type: 'SET_CURRENT_TRACK', payload: nextTrack })
 
-      // Auto-play if we were playing
-      if (state.isPlaying) {
-        setTimeout(() => play(), 100)
+      // Auto-play if we were playing and user has interacted
+      if (state.isPlaying && hasUserInteractedRef.current) {
+        setTimeout(() => play(nextTrack), 100)
       }
     } else {
       // No next track
@@ -419,12 +697,13 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
 
     const prevIndex = getPreviousTrackIndex()
     if (prevIndex >= 0 && state.queue[prevIndex]) {
+      const prevTrack = state.queue[prevIndex]
       dispatch({ type: 'SET_CURRENT_INDEX', payload: prevIndex })
-      dispatch({ type: 'SET_CURRENT_TRACK', payload: state.queue[prevIndex] })
+      dispatch({ type: 'SET_CURRENT_TRACK', payload: prevTrack })
 
-      // Auto-play if we were playing
-      if (state.isPlaying) {
-        setTimeout(() => play(), 100)
+      // Auto-play if we were playing and user has interacted
+      if (state.isPlaying && hasUserInteractedRef.current) {
+        setTimeout(() => play(prevTrack), 100)
       }
     }
   }, [state.currentTime, state.isPlaying, getPreviousTrackIndex, state.queue, play])

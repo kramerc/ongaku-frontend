@@ -35,6 +35,7 @@ export function AudioPlayer({ formatDuration }: AudioPlayerProps) {
     currentIndex,
     repeat,
     shuffle,
+    error,
     play,
     pause,
     next,
@@ -46,6 +47,7 @@ export function AudioPlayer({ formatDuration }: AudioPlayerProps) {
     removeFromQueue,
     clearQueue,
     playFromQueue,
+    clearError,
   } = useAudioPlayer()
 
   const [showQueue, setShowQueue] = useState(false)
@@ -123,6 +125,36 @@ export function AudioPlayer({ formatDuration }: AudioPlayerProps) {
             >
               Retry
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Playback Error Display */}
+      {error && (
+        <div className="bg-yellow-50 border-b border-yellow-200 p-2 dark:bg-yellow-900/20 dark:border-yellow-800/30">
+          <div className="text-sm text-yellow-800 dark:text-yellow-200 text-center">
+            {error}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-2 h-6 text-xs"
+              onClick={clearError}
+            >
+              Dismiss
+            </Button>
+            {error.includes('Autoplay blocked') && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="ml-2 h-6 text-xs"
+                onClick={() => {
+                  clearError()
+                  play()
+                }}
+              >
+                Play Now
+              </Button>
+            )}
           </div>
         </div>
       )}

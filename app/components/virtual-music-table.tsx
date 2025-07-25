@@ -75,7 +75,7 @@ const TrackRow = memo(({
     <TableCell className="text-center" style={{ width: COLUMN_WIDTHS.track }}>
       {track.track_number ? (
         <span className="font-mono text-sm">
-          {track.disc_number && track.disc_number > 1
+          {track.disc_number
             ? `${track.disc_number}-${track.track_number}`
             : track.track_number}
         </span>

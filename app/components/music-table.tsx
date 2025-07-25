@@ -197,7 +197,7 @@ export function MusicTable({
           <Table>
             <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
-                <TableHead className="w-[60px]">Art</TableHead>
+                <TableHead className="w-[60px] text-center">Art</TableHead>
                 <TableHead
                   className="cursor-pointer hover:bg-muted/50 select-none min-w-[200px]"
                   onClick={() => handleSort("title")}
@@ -285,8 +285,10 @@ export function MusicTable({
             <TableBody>
               {sortedTracks.map((track, index) => (
                 <TableRow key={`${track.id}-${index}`} className="hover:bg-muted/50">
-                  <TableCell>
-                    <AlbumArt track={track} size="sm" />
+                  <TableCell className="text-center">
+                    <div className="inline-block">
+                      <AlbumArt track={track} size="sm" />
+                    </div>
                   </TableCell>
                   <TableCell className="font-medium">
                     <div className="truncate" title={track.title}>

@@ -114,11 +114,13 @@ const TrackRow = memo(({
 
   return (
     <TableRow key={`${track.id}-${index}`} className="hover:bg-muted/50" style={{ height: ROW_HEIGHT }}>
-      <TableCell style={{ width: COLUMN_WIDTHS.albumArt }}>
-        <AlbumArt track={track} size="sm" />
+      <TableCell style={{ width: COLUMN_WIDTHS.albumArt }} className="text-center">
+        <div className="inline-block">
+          <AlbumArt track={track} size="sm" />
+        </div>
       </TableCell>
-      <TableCell style={{ width: COLUMN_WIDTHS.actions }}>
-        <div className="flex items-center gap-1">
+      <TableCell style={{ width: COLUMN_WIDTHS.actions }} className="text-center">
+        <div className="flex items-center gap-1 justify-center">
           <Button
             variant="ghost"
             size="sm"
@@ -482,8 +484,8 @@ export function VirtualMusicTable({
               <Table style={{ tableLayout: 'fixed' }}>
                 <TableHeader>
                   <TableRow>
-                    <TableHead style={{ width: COLUMN_WIDTHS.albumArt }}>Art</TableHead>
-                    <TableHead style={{ width: COLUMN_WIDTHS.actions }}>Actions</TableHead>
+                    <TableHead style={{ width: COLUMN_WIDTHS.albumArt }} className="text-center">Art</TableHead>
+                    <TableHead style={{ width: COLUMN_WIDTHS.actions }} className="text-center">Actions</TableHead>
                     <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       style={{ width: COLUMN_WIDTHS.title }}

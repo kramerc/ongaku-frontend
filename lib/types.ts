@@ -74,3 +74,35 @@ export interface PaginationParams {
   page?: number
   per_page?: number
 }
+
+// Audio Player Types
+export interface AudioPlayerState {
+  currentTrack: Track | null
+  isPlaying: boolean
+  volume: number
+  currentTime: number
+  duration: number
+  queue: Track[]
+  currentIndex: number
+  repeat: 'none' | 'one' | 'all'
+  shuffle: boolean
+  error: string | null
+}
+
+export interface AudioPlayerContextType extends AudioPlayerState {
+  play: (track?: Track) => void
+  pause: () => void
+  stop: () => void
+  next: () => void
+  previous: () => void
+  seek: (time: number) => void
+  setVolume: (volume: number) => void
+  addToQueue: (track: Track) => void
+  addAllToQueue: (tracks: Track[], startIndex?: number) => void
+  removeFromQueue: (index: number) => void
+  clearQueue: () => void
+  toggleRepeat: () => void
+  toggleShuffle: () => void
+  playFromQueue: (index: number) => void
+  clearError: () => void
+}

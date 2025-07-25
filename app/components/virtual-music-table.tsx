@@ -3,13 +3,18 @@
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
   Loader2,
+  Play,
+  Pause,
+  Plus,
 } from "lucide-react"
 import { Track } from "@/lib/types"
+import { useAudioPlayer } from "@/contexts/audio-player-context"
 
 interface VirtualMusicTableProps {
   tracks: Track[]
@@ -32,6 +37,7 @@ const OVERSCAN = 5 // Number of extra rows to render outside viewport
 
 // Fixed column widths to ensure header and body alignment
 const COLUMN_WIDTHS = {
+  actions: 100,
   title: 200,
   artist: 150,
   album: 150,
@@ -48,63 +54,122 @@ const COLUMN_WIDTHS = {
 const TrackRow = memo(({
   track,
   index,
+  tracks,
   formatDuration,
   formatAudioQuality
 }: {
   track: Track
   index: number
+  tracks: Track[]
   formatDuration: (seconds: number) => string
   formatAudioQuality: (sampleRate: number, bitDepth: number, channels: number) => string
-}) => (
-  <TableRow key={`${track.id}-${index}`} className="hover:bg-muted/50" style={{ height: ROW_HEIGHT }}>
-    <TableCell className="font-medium" style={{ width: COLUMN_WIDTHS.title }}>
-      <div className="truncate" title={track.title}>
-        {track.title || "Unknown Title"}
-      </div>
-    </TableCell>
-    <TableCell style={{ width: COLUMN_WIDTHS.artist }}>
-      <div className="truncate" title={track.artist}>
-        {track.artist || "Unknown Artist"}
-      </div>
-    </TableCell>
-    <TableCell style={{ width: COLUMN_WIDTHS.album }}>
-      <div className="truncate" title={track.album}>
-        {track.album || "Unknown Album"}
-      </div>
-    </TableCell>
-    <TableCell className="text-center" style={{ width: COLUMN_WIDTHS.track }}>
-      {track.track_number ? (
-        <span className="font-mono text-sm">
-          {track.disc_number
-            ? `${track.disc_number}-${track.track_number}`
-            : track.track_number}
-        </span>
-      ) : null}
-    </TableCell>
-    <TableCell className="text-center" style={{ width: COLUMN_WIDTHS.year }}>
-      {track.year && (
-        <span className="font-mono text-sm">{track.year}</span>
-      )}
-    </TableCell>
-    <TableCell style={{ width: COLUMN_WIDTHS.genre }}>
-      {track.genre && (
-        <Badge variant="secondary" className="text-xs">
-          {track.genre}
+}) => {
+  const { currentTrack, isPlaying, play, pause, addToQueue, addAllToQueue } = useAudioPlayer()
+
+  const isCurrentTrack = currentTrack?.id === track.id
+  const isTrackPlaying = isCurrentTrack && isPlaying
+
+  const handlePlay = () => {
+    if (isCurrentTrack) {
+      if (isPlaying) {
+        pause()
+      } else {
+        play()
+      }
+    } else {
+      play(track)
+    }
+  }
+
+  const handleAddToQueue = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    addToQueue(track)
+    // Simple visual feedback - you could replace this with a proper toast notification
+    console.log(`Added "${track.title}" to queue`)
+  }
+
+  const handlePlayAll = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    addAllToQueue(tracks, index)
+  }
+
+  return (
+    <TableRow key={`${track.id}-${index}`} className="hover:bg-muted/50" style={{ height: ROW_HEIGHT }}>
+      <TableCell style={{ width: COLUMN_WIDTHS.actions }}>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-8 h-8 p-0"
+            onClick={handlePlay}
+            title={isTrackPlaying ? "Pause" : "Play"}
+          >
+            {isTrackPlaying ? (
+              <Pause className="w-4 h-4" />
+            ) : (
+              <Play className="w-4 h-4" />
+            )}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-8 h-8 p-0"
+            onClick={handleAddToQueue}
+            title="Add to queue"
+          >
+            <Plus className="w-4 h-4" />
+          </Button>
+        </div>
+      </TableCell>
+      <TableCell className="font-medium" style={{ width: COLUMN_WIDTHS.title }}>
+        <div className="truncate" title={track.title}>
+          {track.title || "Unknown Title"}
+        </div>
+      </TableCell>
+      <TableCell style={{ width: COLUMN_WIDTHS.artist }}>
+        <div className="truncate" title={track.artist}>
+          {track.artist || "Unknown Artist"}
+        </div>
+      </TableCell>
+      <TableCell style={{ width: COLUMN_WIDTHS.album }}>
+        <div className="truncate" title={track.album}>
+          {track.album || "Unknown Album"}
+        </div>
+      </TableCell>
+      <TableCell className="text-center" style={{ width: COLUMN_WIDTHS.track }}>
+        {track.track_number ? (
+          <span className="font-mono text-sm">
+            {track.disc_number
+              ? `${track.disc_number}-${track.track_number}`
+              : track.track_number}
+          </span>
+        ) : null}
+      </TableCell>
+      <TableCell className="text-center" style={{ width: COLUMN_WIDTHS.year }}>
+        {track.year && (
+          <span className="font-mono text-sm">{track.year}</span>
+        )}
+      </TableCell>
+      <TableCell style={{ width: COLUMN_WIDTHS.genre }}>
+        {track.genre && (
+          <Badge variant="secondary" className="text-xs">
+            {track.genre}
+          </Badge>
+        )}
+      </TableCell>
+      <TableCell className="font-mono text-sm" style={{ width: COLUMN_WIDTHS.duration }}>{formatDuration(track.duration_seconds)}</TableCell>
+      <TableCell className="font-mono text-sm" style={{ width: COLUMN_WIDTHS.bitrate }}>{track.audio_bitrate} kbps</TableCell>
+      <TableCell className="font-mono text-xs" style={{ width: COLUMN_WIDTHS.quality }}>
+        {formatAudioQuality(track.sample_rate, track.bit_depth, track.channels)}
+      </TableCell>
+      <TableCell style={{ width: COLUMN_WIDTHS.format }}>
+        <Badge variant="outline" className="text-xs uppercase">
+          {track.extension}
         </Badge>
-      )}
-    </TableCell>
-    <TableCell className="font-mono text-sm" style={{ width: COLUMN_WIDTHS.duration }}>{formatDuration(track.duration_seconds)}</TableCell>
-    <TableCell className="font-mono text-sm" style={{ width: COLUMN_WIDTHS.bitrate }}>{track.audio_bitrate} kbps</TableCell>
-    <TableCell className="font-mono text-xs" style={{ width: COLUMN_WIDTHS.quality }}>
-      {formatAudioQuality(track.sample_rate, track.bit_depth, track.channels)}
-    </TableCell>
-    <TableCell style={{ width: COLUMN_WIDTHS.format }}>
-      <Badge variant="outline" className="text-xs uppercase">
-        {track.extension}
-      </Badge>
-    </TableCell>
-  </TableRow>
-))
+      </TableCell>
+    </TableRow>
+  )
+})
 
 TrackRow.displayName = 'TrackRow'
 
@@ -124,6 +189,8 @@ export function VirtualMusicTable({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [containerHeight, setContainerHeight] = useState(0)
+
+  const { addAllToQueue } = useAudioPlayer()
 
   // Handle sorting
   const handleSort = (field: SortField) => {
@@ -356,9 +423,26 @@ export function VirtualMusicTable({
   return (
     <div className="h-full flex flex-col">
       {/* Stats */}
-      <div className="px-4 py-2 text-xs text-muted-foreground border-b">
-        Showing {visibleTracks.length} of {sortedTracks.length} tracks
-        {sortedTracks.length !== tracks.length && ` (${tracks.length} total loaded)`}
+      <div className="px-4 py-2 text-xs text-muted-foreground border-b flex justify-between items-center">
+        <span>
+          Showing {visibleTracks.length} of {sortedTracks.length} tracks
+          {sortedTracks.length !== tracks.length && ` (${tracks.length} total loaded)`}
+        </span>
+        {sortedTracks.length > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-6 text-xs"
+            onClick={() => {
+              addAllToQueue(sortedTracks, 0)
+              console.log(`Added ${sortedTracks.length} tracks to queue`)
+            }}
+            title="Play all tracks"
+          >
+            <Play className="w-3 h-3 mr-1" />
+            Play All
+          </Button>
+        )}
       </div>
 
       {/* Virtual Table */}
@@ -371,6 +455,7 @@ export function VirtualMusicTable({
               <Table style={{ tableLayout: 'fixed' }}>
                 <TableHeader>
                   <TableRow>
+                    <TableHead style={{ width: COLUMN_WIDTHS.actions }}>Actions</TableHead>
                     <TableHead
                       className="cursor-pointer hover:bg-muted/50 select-none"
                       style={{ width: COLUMN_WIDTHS.title }}
@@ -476,6 +561,7 @@ export function VirtualMusicTable({
                       key={`${track.id}-${visibleStartIndex + index}`}
                       track={track}
                       index={visibleStartIndex + index}
+                      tracks={sortedTracks}
                       formatDuration={formatDuration}
                       formatAudioQuality={formatAudioQuality}
                     />
@@ -484,7 +570,7 @@ export function VirtualMusicTable({
                   {/* Loading more indicator */}
                   {loadingMore && !allTracksLoaded && (
                     <TableRow key="loading-more" style={{ height: ROW_HEIGHT }}>
-                      <TableCell colSpan={10} className="text-center py-4">
+                      <TableCell colSpan={11} className="text-center py-4">
                         <div className="flex items-center justify-center">
                           <Loader2 className="w-4 h-4 animate-spin mr-2" />
                           Loading more tracks...

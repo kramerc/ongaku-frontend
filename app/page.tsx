@@ -9,6 +9,8 @@ import { Loader2, Search, Music, RefreshCw, X } from "lucide-react"
 import { VirtualMusicTable } from "./components/virtual-music-table"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { LibraryBrowser } from "@/components/library-browser"
+import { AudioPlayer } from "@/components/audio-player"
+import { AudioPlayerProvider } from "@/contexts/audio-player-context"
 import { Badge } from "@/components/ui/badge"
 import { Track, TrackListResponse, LibraryStats } from "@/lib/types"
 import { apiService } from "@/lib/api"
@@ -305,39 +307,40 @@ export default function MusicLibrary() {
   }
 
   return (
-    <div className="h-screen flex flex-col">
-      {/* Header with Search Bar */}
-      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-3">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Music className="w-5 h-5 text-primary" />
-            <span className="font-semibold text-sm">Music Library</span>
-            {tracks.length > 0 && (
-              <Badge variant="secondary" className="text-xs">
-                {tracks.length.toLocaleString()}
-                {totalTracks > tracks.length ? ` of ${totalTracks.toLocaleString()}` : ''} tracks
-              </Badge>
-            )}
-            {(loading || loadingMore) && loadingProgress.operation && !isSyncing && (
-              <Badge variant="outline" className="text-xs flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                {loadingProgress.operation}
-                {loadingProgress.total > 0 && (
-                  <span>({loadingProgress.current}/{loadingProgress.total})</span>
-                )}
-              </Badge>
-            )}
-            {isSyncing && syncProgress.operation && (
-              <Badge variant="outline" className="text-xs flex items-center gap-1">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                {syncProgress.operation}
-                {syncProgress.total > 0 && (
-                  <span>({syncProgress.current}/{syncProgress.total})</span>
-                )}
-              </Badge>
-            )}
-            <ThemeToggle />
-          </div>
+    <AudioPlayerProvider>
+      <div className="h-screen flex flex-col">
+        {/* Header with Search Bar */}
+        <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Music className="w-5 h-5 text-primary" />
+              <span className="font-semibold text-sm">Music Library</span>
+              {tracks.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {tracks.length.toLocaleString()}
+                  {totalTracks > tracks.length ? ` of ${totalTracks.toLocaleString()}` : ''} tracks
+                </Badge>
+              )}
+              {(loading || loadingMore) && loadingProgress.operation && !isSyncing && (
+                <Badge variant="outline" className="text-xs flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  {loadingProgress.operation}
+                  {loadingProgress.total > 0 && (
+                    <span>({loadingProgress.current}/{loadingProgress.total})</span>
+                  )}
+                </Badge>
+              )}
+              {isSyncing && syncProgress.operation && (
+                <Badge variant="outline" className="text-xs flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  {syncProgress.operation}
+                  {syncProgress.total > 0 && (
+                    <span>({syncProgress.current}/{syncProgress.total})</span>
+                  )}
+                </Badge>
+              )}
+              <ThemeToggle />
+            </div>
 
           <form onSubmit={handleSearch} className="flex gap-2 flex-1 max-w-md ml-auto">
             <div className="relative flex-1">
@@ -490,6 +493,10 @@ export default function MusicLibrary() {
           )}
         </div>
       </div>
+
+      {/* Audio Player */}
+      <AudioPlayer formatDuration={formatDuration} />
     </div>
+    </AudioPlayerProvider>
   )
 }

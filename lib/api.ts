@@ -293,6 +293,11 @@ class ApiService {
 
     return response
   }
+
+  // Get audio stream URL for a track
+  getAudioStreamUrl(trackId: number): string {
+    return `${this.baseUrl}/tracks/${trackId}/play`
+  }
 }
 
 // Export singleton instance

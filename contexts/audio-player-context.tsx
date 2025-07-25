@@ -721,9 +721,22 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   }, [])
 
   const addToQueue = useCallback((track: Track) => {
+    // Validate track object
+    if (!track || !track.id || typeof track.id !== 'number') {
+      console.error('Invalid track object passed to addToQueue:', track)
+      return
+    }
+    
     const existingIndex = state.queue.findIndex(t => t.id === track.id)
     if (existingIndex === -1) {
       dispatch({ type: 'ADD_TO_QUEUE', payload: track })
+      console.log('Track added to queue:', {
+        id: track.id,
+        title: track.title || 'Unknown Title',
+        artist: track.artist || 'Unknown Artist'
+      })
+    } else {
+      console.log('Track already in queue:', track.title || 'Unknown Title')
     }
   }, [state.queue])
 

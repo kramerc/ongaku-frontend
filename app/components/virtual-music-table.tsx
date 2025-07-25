@@ -77,20 +77,49 @@ const TrackRow = memo(({
         play()
       }
     } else {
-      play(track)
+      // Ensure track has meaningful metadata before playing
+      const trackToPlay = {
+        ...track,
+        title: track.title?.trim() || 'Unknown Title',
+        artist: track.artist?.trim() || 'Unknown Artist',
+        album: track.album?.trim() || 'Unknown Album'
+      }
+      play(trackToPlay)
     }
   }
 
   const handleAddToQueue = (e: React.MouseEvent) => {
     e.stopPropagation()
-    addToQueue(track)
+    
+    // Validate track before adding to queue
+    if (!track || !track.id) {
+      console.error('Invalid track object:', track)
+      return
+    }
+    
+    // Ensure track has meaningful metadata
+    const trackToAdd = {
+      ...track,
+      title: track.title?.trim() || 'Unknown Title',
+      artist: track.artist?.trim() || 'Unknown Artist',
+      album: track.album?.trim() || 'Unknown Album'
+    }
+    
+    addToQueue(trackToAdd)
     // Simple visual feedback - you could replace this with a proper toast notification
-    console.log(`Added "${track.title}" to queue`)
+    console.log(`Added "${trackToAdd.title}" to queue`)
   }
 
   const handlePlayAll = (e: React.MouseEvent) => {
     e.stopPropagation()
-    addAllToQueue(tracks, index)
+    // Normalize track data before adding to queue
+    const normalizedTracks = tracks.map(t => ({
+      ...t,
+      title: t.title?.trim() || 'Unknown Title',
+      artist: t.artist?.trim() || 'Unknown Artist',
+      album: t.album?.trim() || 'Unknown Album'
+    }))
+    addAllToQueue(normalizedTracks, index)
   }
 
   return (

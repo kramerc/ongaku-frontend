@@ -64,6 +64,44 @@ export function MusicTable({
 
   // Sort tracks locally (since API doesn't support custom sorting)
   const sortedTracks = [...tracks].sort((a, b) => {
+    // Special sorting for album field
+    if (sortField === "album") {
+      // First compare album names
+      const albumComparison = a.album.localeCompare(b.album)
+      if (albumComparison !== 0) {
+        return sortDirection === "asc" ? albumComparison : -albumComparison
+      }
+
+      // If album names are the same, sort by disc number (nullish values go to end)
+      const aDisc = a.disc_number ?? Number.MAX_SAFE_INTEGER
+      const bDisc = b.disc_number ?? Number.MAX_SAFE_INTEGER
+      const discComparison = aDisc - bDisc
+      if (discComparison !== 0) {
+        return sortDirection === "asc" ? discComparison : -discComparison
+      }
+
+      // If disc numbers are the same, sort by track number (nullish values go to end)
+      const aTrack = a.track_number ?? Number.MAX_SAFE_INTEGER
+      const bTrack = b.track_number ?? Number.MAX_SAFE_INTEGER
+      const trackComparison = aTrack - bTrack
+      if (trackComparison !== 0) {
+        return sortDirection === "asc" ? trackComparison : -trackComparison
+      }
+
+      // If track numbers are the same, sort by year (nullish values go to end, oldest first)
+      const aYear = a.year ?? Number.MAX_SAFE_INTEGER
+      const bYear = b.year ?? Number.MAX_SAFE_INTEGER
+      const yearComparison = aYear - bYear
+      if (yearComparison !== 0) {
+        return sortDirection === "asc" ? yearComparison : -yearComparison
+      }
+
+      // Finally, fall back to title comparison
+      const titleComparison = a.title.localeCompare(b.title)
+      return sortDirection === "asc" ? titleComparison : -titleComparison
+    }
+
+    // Default sorting logic for other fields
     const aValue = a[sortField]
     const bValue = b[sortField]
 

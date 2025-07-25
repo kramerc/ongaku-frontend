@@ -101,13 +101,12 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
 
   // Helper function to retry loading audio after abort
   const retryAudioLoad = useCallback(() => {
-    if (!audioRef.current || !state.currentTrack || retryCountRef.current >= maxRetries) {
-      console.log('Max retries reached or no audio context available')
+    if (!audioRef.current || !state.currentTrack) {
+      console.log('No audio context available for retry')
       return
     }
 
-    retryCountRef.current += 1
-    console.log(`Retrying audio load (attempt ${retryCountRef.current}/${maxRetries})`)
+    console.log(`Retrying audio load (attempt ${retryCountRef.current + 1}/${maxRetries})`)
 
     const audio = audioRef.current
     // Force reload the audio
@@ -161,11 +160,10 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
           let errorMessage = 'Failed to start playback - please click play'
           if (error.name === 'AbortError' || error.message.includes('aborted')) {
             if (retryCountRef.current < maxRetries) {
-              errorMessage = `Audio loading interrupted, retrying... (${retryCountRef.current + 1}/${maxRetries})`
-              console.log('Audio loading aborted, scheduling retry')
+              retryCountRef.current += 1
+              console.warn(`Audio loading aborted, retrying... (${retryCountRef.current}/${maxRetries})`)
               setTimeout(() => retryAudioLoad(), 1000) // Retry after 1 second
-              dispatch({ type: 'SET_ERROR', payload: errorMessage })
-              return // Don't reset playing intent, we're retrying
+              return // Don't show error message or reset playing intent during retry
             } else {
               errorMessage = 'Audio loading failed after multiple attempts - please try again'
             }
@@ -211,11 +209,10 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
           let errorMessage = 'Failed to start playback - please try again'
           if (error.name === 'AbortError' || error.message.includes('aborted')) {
             if (retryCountRef.current < maxRetries) {
-              errorMessage = `Audio loading interrupted, retrying... (${retryCountRef.current + 1}/${maxRetries})`
-              console.log('Audio loading aborted during canplay, scheduling retry')
+              retryCountRef.current += 1
+              console.warn(`Audio loading aborted during canplay, retrying... (${retryCountRef.current}/${maxRetries})`)
               setTimeout(() => retryAudioLoad(), 1000) // Retry after 1 second
-              dispatch({ type: 'SET_ERROR', payload: errorMessage })
-              return // Don't reset playing intent, we're retrying
+              return // Don't show error message or reset playing intent during retry
             } else {
               errorMessage = 'Audio loading failed after multiple attempts - please try again'
             }
@@ -644,12 +641,11 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
             let userErrorMessage = errorMessage
             if (error?.name === 'AbortError' || errorMessage.includes('aborted')) {
               if (retryCountRef.current < maxRetries) {
-                userErrorMessage = `Audio loading interrupted, retrying... (${retryCountRef.current + 1}/${maxRetries})`
-                console.log('Audio loading aborted in play function, scheduling retry')
+                retryCountRef.current += 1
+                console.warn(`Audio loading aborted in play function, retrying... (${retryCountRef.current}/${maxRetries})`)
                 setTimeout(() => retryAudioLoad(), 1000) // Retry after 1 second
                 dispatch({ type: 'SET_PLAYING', payload: false })
-                dispatch({ type: 'SET_ERROR', payload: userErrorMessage })
-                return // Don't reset playing intent, we're retrying
+                return // Don't show error message or reset playing intent during retry
               } else {
                 userErrorMessage = 'Audio loading failed after multiple attempts - please try again'
               }

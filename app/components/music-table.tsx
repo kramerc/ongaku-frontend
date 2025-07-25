@@ -9,28 +9,7 @@ import {
   ArrowDown,
   Loader2,
 } from "lucide-react"
-
-interface Track {
-  id: number
-  path: string
-  extension: string
-  title: string
-  artist: string
-  album: string
-  genre: string
-  album_artist: string
-  publisher: string
-  catalog_number: string
-  duration_seconds: number
-  audio_bitrate: number
-  overall_bitrate: number
-  sample_rate: number
-  bit_depth: number
-  channels: number
-  tags: Record<string, any>
-  created: string
-  modified: string
-}
+import { Track } from "@/lib/types"
 
 interface MusicTableProps {
   tracks: Track[]
@@ -166,6 +145,24 @@ export function MusicTable({
                   </div>
                 </TableHead>
                 <TableHead
+                  className="cursor-pointer hover:bg-muted/50 select-none min-w-[60px]"
+                  onClick={() => handleSort("track_number")}
+                >
+                  <div className="flex items-center gap-2">
+                    Track
+                    <SortIcon field="track_number" />
+                  </div>
+                </TableHead>
+                <TableHead
+                  className="cursor-pointer hover:bg-muted/50 select-none min-w-[60px]"
+                  onClick={() => handleSort("year")}
+                >
+                  <div className="flex items-center gap-2">
+                    Year
+                    <SortIcon field="year" />
+                  </div>
+                </TableHead>
+                <TableHead
                   className="cursor-pointer hover:bg-muted/50 select-none min-w-[100px]"
                   onClick={() => handleSort("genre")}
                 >
@@ -222,6 +219,20 @@ export function MusicTable({
                       {track.album || "Unknown Album"}
                     </div>
                   </TableCell>
+                  <TableCell className="text-center">
+                    {track.track_number ? (
+                      <span className="font-mono text-sm">
+                        {track.disc_number && track.disc_number > 1
+                          ? `${track.disc_number}-${track.track_number}`
+                          : track.track_number}
+                      </span>
+                    ) : null}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {track.year && (
+                      <span className="font-mono text-sm">{track.year}</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {track.genre && (
                       <Badge variant="secondary" className="text-xs">
@@ -245,7 +256,7 @@ export function MusicTable({
               {/* Loading more indicator */}
               {loadingMore && (
                 <TableRow key="loading-more">
-                  <TableCell colSpan={8} className="text-center py-4">
+                  <TableCell colSpan={10} className="text-center py-4">
                     <div className="flex items-center justify-center">
                       <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       Loading more tracks...

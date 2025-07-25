@@ -1,36 +1,156 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ongaku Music Library Frontend
+
+A modern web frontend for the Ongaku Music Server API, built with Next.js, TypeScript, and Tailwind CSS.
+
+## Features
+
+### Core Functionality
+- **Music Library Browser**: Browse your entire music collection with pagination
+- **Advanced Search**: Full-text search across tracks, artists, albums, and genres
+- **Filtering**: Filter tracks by artist, album, genre, or album artist
+- **Sorting**: Sort tracks by any column (title, artist, album, year, duration, etc.)
+- **Library Statistics**: View comprehensive library stats including total tracks, duration, and unique counts
+
+### API Integration
+This frontend is fully integrated with the Ongaku Music Server API v1.0.0:
+
+#### Endpoints Used:
+- `GET /tracks` - Paginated track listing with filters
+- `GET /tracks/search` - Full-text search across all fields
+- `GET /tracks/{id}` - Individual track details
+- `GET /stats` - Library statistics
+- `GET /artists` - List of all artists
+- `GET /albums` - List of all albums  
+- `GET /genres` - List of all genres
+- `POST /rescan` - Trigger library rescan
+
+#### Track Data Fields:
+- Basic metadata: title, artist, album, genre
+- Track details: track number, disc number, year
+- Technical info: duration, bitrate, sample rate, bit depth, channels
+- File info: format, path, creation/modification dates
+- Additional tags: custom metadata as JSON
+
+### UI Features
+- **Responsive Design**: Works on desktop and mobile devices
+- **Dark/Light Theme**: Toggle between themes with system preference detection
+- **Infinite Scroll**: Automatic loading of more tracks as you scroll
+- **Library Browser Sidebar**: Navigate by artists, albums, genres, or view statistics
+- **Active Filters Display**: Visual indicators for applied filters with easy removal
+- **Loading States**: Smooth loading indicators throughout the interface
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js 18+ 
+- The Ongaku Music Server running on `http://localhost:3000`
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd ongaku-frontend
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Run the development server:
+   ```bash
+   npm run dev
+   ```
+
+4. Open [http://localhost:3001](http://localhost:3001) in your browser
+
+### Configuration
+
+The API base URL is configured in `/lib/types.ts`:
+```typescript
+export const API_BASE_URL = "http://localhost:3000/api/v1"
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Update this if your Ongaku server is running on a different host/port.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Project Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+├── app/
+│   ├── components/
+│   │   └── music-table.tsx      # Main track listing table
+│   ├── globals.css              # Global styles
+│   ├── layout.tsx               # Root layout
+│   ├── loading.tsx              # Loading UI
+│   └── page.tsx                 # Main application page
+├── components/
+│   ├── library-browser.tsx      # Sidebar for browsing/filtering
+│   ├── theme-provider.tsx       # Theme context provider
+│   ├── theme-toggle.tsx         # Dark/light mode toggle
+│   └── ui/                      # Reusable UI components
+├── lib/
+│   ├── api.ts                   # API service layer
+│   ├── types.ts                 # TypeScript type definitions
+│   └── utils.ts                 # Utility functions
+└── public/                      # Static assets
+```
 
-## Learn More
+## API Service Layer
 
-To learn more about Next.js, take a look at the following resources:
+The application uses a centralized API service (`/lib/api.ts`) that provides:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- Type-safe API calls
+- Centralized error handling  
+- Consistent request/response formatting
+- Support for all Ongaku API endpoints
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Example usage:
+```typescript
+import { apiService } from '@/lib/api'
 
-## Deploy on Vercel
+// Get paginated tracks with filters
+const tracks = await apiService.getTracks({
+  page: 1,
+  per_page: 50,
+  artist: 'The Beatles'
+})
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+// Search tracks
+const searchResults = await apiService.searchTracks({
+  q: 'Abbey Road',
+  page: 1,
+  per_page: 20
+})
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+// Get library statistics
+const stats = await apiService.getStats()
+```
+
+## Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+
+## Technologies Used
+
+- **Next.js 15** - React framework with App Router
+- **TypeScript** - Type safety and enhanced developer experience
+- **Tailwind CSS** - Utility-first CSS framework
+- **Radix UI** - Accessible component primitives
+- **Lucide React** - Icon library
+- **next-themes** - Theme switching functionality
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
+
+## License
+
+MIT License

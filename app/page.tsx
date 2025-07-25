@@ -5,49 +5,13 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Loader2, Search, Music } from "lucide-react"
+import { Loader2, Search, Music, RefreshCw, X } from "lucide-react"
 import { MusicTable } from "./components/music-table"
 import { ThemeToggle } from "@/components/theme-toggle"
-
-interface Track {
-  id: number
-  path: string
-  extension: string
-  title: string
-  artist: string
-  album: string
-  genre: string
-  album_artist: string
-  publisher: string
-  catalog_number: string
-  duration_seconds: number
-  audio_bitrate: number
-  overall_bitrate: number
-  sample_rate: number
-  bit_depth: number
-  channels: number
-  tags: Record<string, any>
-  created: string
-  modified: string
-}
-
-interface TrackListResponse {
-  tracks: Track[]
-  total: number
-  page: number
-  per_page: number
-  total_pages: number
-}
-
-interface LibraryStats {
-  total_tracks: number
-  total_duration_seconds: number
-  unique_artists: number
-  unique_albums: number
-  unique_genres: number
-}
-
-const API_BASE_URL = "http://localhost:3000/api/v1"
+import { LibraryBrowser } from "@/components/library-browser"
+import { Badge } from "@/components/ui/badge"
+import { Track, TrackListResponse, LibraryStats } from "@/lib/types"
+import { apiService } from "@/lib/api"
 
 export default function MusicLibrary() {
   const [tracks, setTracks] = useState<Track[]>([])
@@ -59,26 +23,27 @@ export default function MusicLibrary() {
   const [totalTracks, setTotalTracks] = useState(0)
   const [stats, setStats] = useState<LibraryStats | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [rescanLoading, setRescanLoading] = useState(false)
+  const [activeFilters, setActiveFilters] = useState<Record<string, string>>({})
 
   const perPage = 50
 
   // Fetch library statistics
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/stats`)
-        if (!response.ok) throw new Error("Failed to fetch stats")
-        const data = await response.json()
-        setStats(data)
-      } catch (err) {
-        console.error("Error fetching stats:", err)
-      }
+  const fetchStats = async () => {
+    try {
+      const data = await apiService.getStats()
+      setStats(data)
+    } catch (err) {
+      console.error("Error fetching stats:", err)
     }
+  }
+
+  useEffect(() => {
     fetchStats()
   }, [])
 
   // Fetch tracks
-  const fetchTracks = async (page: number, query?: string, append: boolean = false) => {
+  const fetchTracks = async (page: number, query?: string, append: boolean = false, filters?: Record<string, string>) => {
     if (append) {
       setLoadingMore(true)
     } else {
@@ -90,18 +55,24 @@ export default function MusicLibrary() {
     setError(null)
 
     try {
-      let url = `${API_BASE_URL}/tracks?page=${page}&per_page=${perPage}`
+      let data: TrackListResponse
 
+      // If there's a search query, use the search endpoint
       if (query && query.trim()) {
-        url = `${API_BASE_URL}/tracks/search?q=${encodeURIComponent(query.trim())}&page=${page}&per_page=${perPage}`
+        data = await apiService.searchTracks({
+          q: query.trim(),
+          page,
+          per_page: perPage
+        })
+      } else {
+        // Otherwise, use the regular tracks endpoint with filters
+        const currentFilters = filters || activeFilters
+        data = await apiService.getTracks({
+          page,
+          per_page: perPage,
+          ...currentFilters
+        })
       }
-
-      const response = await fetch(url)
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data: TrackListResponse = await response.json()
 
       if (append) {
         setTracks(prev => {
@@ -139,10 +110,52 @@ export default function MusicLibrary() {
     fetchTracks(1, searchQuery, false)
   }
 
+  // Handle filter
+  const handleFilter = (type: string, value: string) => {
+    console.log('Adding filter:', type, value) // Debug log
+    const newFilters = { ...activeFilters, [type]: value }
+    setActiveFilters(newFilters)
+    setSearchQuery("") // Clear search when filtering
+    fetchTracks(1, "", false, newFilters)
+  }
+
+  // Remove filter
+  const removeFilter = (type: string) => {
+    console.log('Removing filter:', type) // Debug log
+    const newFilters = { ...activeFilters }
+    delete newFilters[type]
+    setActiveFilters(newFilters)
+    fetchTracks(1, searchQuery, false, newFilters)
+  }
+
+  // Clear all filters
+  const clearAllFilters = () => {
+    setActiveFilters({})
+    setSearchQuery("")
+    fetchTracks(1, "", false, {})
+  }
+
   // Load more tracks
   const loadMoreTracks = () => {
     if (hasMorePages && !loadingMore) {
       fetchTracks(currentPage + 1, searchQuery, true)
+    }
+  }
+
+  // Rescan library
+  const handleRescan = async () => {
+    setRescanLoading(true)
+    try {
+      const data = await apiService.rescanLibrary()
+      console.log("Rescan initiated:", data.message)
+      // Optionally refresh stats after rescan
+      setTimeout(() => {
+        fetchStats()
+      }, 1000)
+    } catch (err) {
+      console.error("Error initiating rescan:", err)
+    } finally {
+      setRescanLoading(false)
     }
   }
 
@@ -174,7 +187,7 @@ export default function MusicLibrary() {
 
   return (
     <div className="h-screen flex flex-col">
-      {/* Minimal Search Bar */}
+      {/* Header with Search Bar */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 p-3">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
@@ -197,46 +210,86 @@ export default function MusicLibrary() {
             <Button type="submit" disabled={loading} size="sm" className="h-8">
               {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : "Search"}
             </Button>
-            {searchQuery && (
+            {(searchQuery || Object.keys(activeFilters).length > 0) && (
               <Button
                 variant="outline"
                 size="sm"
                 className="h-8"
-                onClick={() => {
-                  setSearchQuery("")
-                  fetchTracks(1, "", false)
-                }}
+                onClick={clearAllFilters}
               >
-                Clear
+                Clear All
               </Button>
             )}
           </form>
-        </div>
-      </div>
 
-      {/* Full Screen Music Table */}
-      <div className="flex-1 overflow-hidden p-4">
-        {error ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <p className="text-destructive mb-2">Error: {error}</p>
-              <Button variant="outline" onClick={() => fetchTracks(1, searchQuery, false)}>
-                Retry
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <div className="h-full overflow-auto">
-            <MusicTable
-              tracks={tracks}
-              loading={loading}
-              loadingMore={loadingMore}
-              hasMorePages={hasMorePages}
-              onLoadMore={loadMoreTracks}
-              formatDuration={formatDuration}
-            />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8"
+            onClick={handleRescan}
+            disabled={rescanLoading}
+          >
+            {rescanLoading ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <RefreshCw className="w-3 h-3" />
+            )}
+            Rescan
+          </Button>
+        </div>
+
+        {/* Active Filters */}
+        {Object.keys(activeFilters).length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {Object.entries(activeFilters).map(([type, value]) => (
+              <div key={type} className="flex items-center gap-1">
+                <Badge variant="secondary" className="text-xs">
+                  {type}: {value}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-5 h-5 p-0 hover:bg-destructive hover:text-destructive-foreground rounded-full"
+                  onClick={() => removeFilter(type)}
+                  title={`Remove ${type} filter`}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+            ))}
           </div>
         )}
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Library Browser Sidebar */}
+        <LibraryBrowser onFilter={handleFilter} stats={stats} activeFilters={activeFilters} />
+
+        {/* Music Table */}
+        <div className="flex-1 overflow-hidden p-4">
+          {error ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <p className="text-destructive mb-2">Error: {error}</p>
+                <Button variant="outline" onClick={() => fetchTracks(1, searchQuery, false)}>
+                  Retry
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full overflow-auto">
+              <MusicTable
+                tracks={tracks}
+                loading={loading}
+                loadingMore={loadingMore}
+                hasMorePages={hasMorePages}
+                onLoadMore={loadMoreTracks}
+                formatDuration={formatDuration}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )
